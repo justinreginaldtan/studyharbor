@@ -1,3 +1,6 @@
+// This boundary must run on the client to work correctly with React class components.
+"use client";
+
 // components/ErrorBoundary.tsx
 import React, { ErrorInfo, ReactNode } from 'react';
 import * as Sentry from '@sentry/nextjs';
