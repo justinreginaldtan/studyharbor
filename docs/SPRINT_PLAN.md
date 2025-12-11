@@ -1,4 +1,4 @@
-# 2-Week Sprint: Portfolio-Ready CozyFocus
+# 2-Week Sprint: Portfolio-Ready StudyHarbor
 
 **Goal:** Transform MVP into job-ready portfolio piece showcasing end-to-end technical depth
 
@@ -176,7 +176,7 @@ export async function migrateGuestToUser(
   userId: string
 ) {
   // Copy guest preferences to user profile
-  const guestData = localStorage.getItem('cozyfocus.identity');
+  const guestData = localStorage.getItem('studyharbor.identity');
   await supabase.from('profiles').insert({
     id: userId,
     display_name: guestData.displayName,
@@ -237,18 +237,15 @@ app/
   (authenticated)/
     room/[roomId]/page.tsx (150 lines)
   components/
-    CozyRoom/
-      CozyRoomContainer.tsx      -- Main orchestrator
+    lounge/
       usePresenceManager.ts      -- Presence logic
       useTimerSync.ts            -- Timer sync logic
-      useAvatarRenderer.ts       -- Canvas rendering
-      AvatarCanvas.tsx           -- Rendering component
-      RoomParticipants.tsx       -- Participant list
+      useIdentityManager.ts      -- Identity/profile sync
 ```
 
 **Hook Extraction:**
 ```typescript
-// components/CozyRoom/usePresenceManager.ts
+// components/lounge/usePresenceManager.ts
 export function usePresenceManager(roomId: string) {
   const [participants, setParticipants] = useState<Participant[]>([]);
 
@@ -261,7 +258,7 @@ export function usePresenceManager(roomId: string) {
   return { participants, broadcastPosition, updateStatus };
 }
 
-// components/CozyRoom/useTimerSync.ts
+// components/lounge/useTimerSync.ts
 export function useTimerSync(roomId: string, mode: 'solo' | 'shared') {
   const [timerState, setTimerState] = useState<TimerState>();
 
@@ -679,7 +676,7 @@ export class ErrorBoundary extends React.Component {
 
 **README Structure:**
 ```markdown
-# CozyFocus - Collaborative Study Rooms
+# StudyHarbor - Collaborative Study Rooms
 
 > A real-time collaborative Pomodoro timer with social presence
 
@@ -754,7 +751,7 @@ export class ErrorBoundary extends React.Component {
 
 ### Resume Bullets
 ```
-CozyFocus - Real-Time Collaborative Study Platform
+StudyHarbor - Real-Time Collaborative Study Platform
 • Architected real-time presence system supporting 50+ concurrent users
   using Supabase Realtime and WebSocket channels
 • Implemented secure authentication with Row Level Security policies
@@ -885,7 +882,7 @@ If time runs short, prioritize:
 
 ## Conclusion
 
-This sprint transforms CozyFocus from a beautiful demo into a production-ready SaaS application. By focusing on authentication, database design, payment integration, and architectural refactoring, you'll demonstrate the full spectrum of full-stack development skills that hiring managers seek.
+This sprint transforms StudyHarbor from a beautiful demo into a production-ready SaaS application. By focusing on authentication, database design, payment integration, and architectural refactoring, you'll demonstrate the full spectrum of full-stack development skills that hiring managers seek.
 
 **Remember:** Recruiters spend 30 seconds on your portfolio. Make sure:
 - README is visually stunning

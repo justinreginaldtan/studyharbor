@@ -1,9 +1,12 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { X, Settings, Users, Info, Clock, Coffee, Droplets, UserCircle, LayoutGrid, Palette, LogOut, Mail } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
+import { X, Settings, Users, Info, Clock, Coffee, Droplets, UserCircle, LayoutGrid, Palette, LogOut, Mail, DollarSign } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
 import { COZY_AVATAR_COLORS } from "@/lib/utils";
 import { authService } from "@/lib/auth/authService";
-import { supabase } from "@/lib/supabaseClient";
+import type { User } from "@supabase/supabase-js";
+import { getPlanLabel, isPro } from "@/lib/features/featureGate";
+import { events } from "@/lib/analytics/events";
 
 // Props for the Players tab
 type Participant = {
@@ -34,6 +37,10 @@ type CornerstoneMenuProps = {
   initialName: string;
   initialColor: string;
   onConfirm: (identity: { displayName: string; color: string }) => void;
+  // Auth props
+  user: User | null;
+  toggleAuthModal: (isOpen: boolean) => void;
+  subscriptionStatus: string;
 };
 
 const COLOR_NAMES: Record<string, string> = {
@@ -48,9 +55,17 @@ const COLOR_NAMES: Record<string, string> = {
 };
 
 // Avatar Tab Content
-function AvatarContent({ initialName, initialColor, onConfirm, onClose }: Omit<CornerstoneMenuProps, 'open'>) {
+function AvatarContent({ initialName, initialColor, onConfirm, onClose }: Omit<CornerstoneMenuProps, 'open' | 'user' | 'toggleAuthModal'>) {
   const [name, setName] = useState(initialName);
   const [color, setColor] = useState(initialColor);
+
+  useEffect(() => {
+    setName(initialName);
+  }, [initialName]);
+
+  useEffect(() => {
+    setColor(initialColor);
+  }, [initialColor]);
 
   const handleSave = () => {
     const trimmed = name.trim();
@@ -123,12 +138,11 @@ function AvatarContent({ initialName, initialColor, onConfirm, onClose }: Omit<C
   );
 }
 
-
 // About Tab Content
 function AboutContent({ onlineCount, displayName }: { onlineCount: number; displayName: string }) {
   return (
     <div className="text-slate-300/90 leading-relaxed">
-      <h3 className="text-lg font-semibold text-parchment">CozyFocus 🌙</h3>
+      <h3 className="text-lg font-semibold text-parchment">StudyHarbor 🌙</h3>
       <p className="mt-4 text-sm" style={{ lineHeight: 1.7 }}>
         A quiet space to study together.
         <br />
@@ -203,7 +217,7 @@ function PlayersContent({ participants, onlineCount }: { participants: Participa
 }
 
 // Settings Tab Content
-function SettingsContent(props: Omit<CornerstoneMenuProps, 'open' | 'onClose' | 'participants' | 'onlineCount' | 'displayName' | 'initialName' | 'initialColor' | 'onConfirm'>) {
+function SettingsContent(props: Omit<CornerstoneMenuProps, 'open' | 'onClose' | 'participants' | 'onlineCount' | 'displayName' | 'initialName' | 'initialColor' | 'onConfirm' | 'user' | 'toggleAuthModal'>) {
   return (
     <div className="h-full overflow-y-auto pr-4 text-sm">
       <section className="space-y-4">
@@ -262,41 +276,19 @@ function SettingsContent(props: Omit<CornerstoneMenuProps, 'open' | 'onClose' | 
 }
 
 // Account Tab Content
-function AccountContent({ onClose }: { onClose: () => void }) {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [userEmail, setUserEmail] = useState('');
-  const [userName, setUserName] = useState('');
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        setIsAuthenticated(true);
-        setUserEmail(session.user.email || '');
-        setUserName(session.user.user_metadata?.display_name || session.user.email?.split('@')[0] || 'User');
-      }
-      setLoading(false);
-    };
-
-    checkAuth();
-  }, []);
-
+function AccountContent({ user, toggleAuthModal, onClose, displayName, subscriptionStatus }: { user: User | null, toggleAuthModal: (isOpen: boolean) => void, onClose: () => void, displayName: string, subscriptionStatus: string }) {
+  
   const handleSignOut = async () => {
     await authService.signOut();
     onClose();
-    window.location.reload(); // Reload to show welcome modal
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-pulse-soft text-parchment">Loading...</div>
-      </div>
-    );
-  }
+  const handleSignIn = () => {
+    toggleAuthModal(true);
+    onClose();
+  };
 
-  if (!isAuthenticated) {
+  if (!user) {
     return (
       <div className="space-y-6">
         <div className="text-center space-y-4">
@@ -334,11 +326,7 @@ function AccountContent({ onClose }: { onClose: () => void }) {
         </div>
 
         <button
-          onClick={() => {
-            onClose();
-            // Reload to show auth modal
-            window.location.reload();
-          }}
+          onClick={handleSignIn}
           className="w-full rounded-full bg-twilight-ember/90 px-6 py-3 text-sm font-semibold text-twilight shadow-[0_18px_36px_rgba(252,211,77,0.45)] transition hover:scale-[1.02] active:scale-[0.98]"
         >
           Sign In / Sign Up
@@ -348,6 +336,31 @@ function AccountContent({ onClose }: { onClose: () => void }) {
   }
 
   // Authenticated user view
+  const userEmail = user.email || '';
+  const userName = displayName;
+  const planLabel = getPlanLabel(subscriptionStatus);
+  const isProStatus = isPro(subscriptionStatus);
+  const [billingLoading, setBillingLoading] = useState(false);
+
+  const handleManageBilling = async () => {
+    try {
+      setBillingLoading(true);
+      events.billingPortalOpened();
+      const response = await fetch("/api/billing/portal", { method: "POST" });
+      if (!response.ok) {
+        throw new Error("Unable to open billing portal");
+      }
+      const payload = await response.json();
+      if (payload?.url) {
+        window.location.href = payload.url;
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setBillingLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* User Info Card */}
@@ -370,12 +383,15 @@ function AccountContent({ onClose }: { onClose: () => void }) {
       <div className="p-4 rounded-lg bg-twilight-overlay border border-white/10">
         <div className="flex items-center justify-between mb-3">
           <span className="text-xs uppercase tracking-wider text-slate-300/70">Account Status</span>
-          <span className="px-2 py-1 rounded-full bg-green-500/20 text-green-400 text-xs font-medium">
-            Active
+          <span className={`px-2 py-1 rounded-full text-xs font-medium ${isProStatus ? 'bg-green-500/20 text-green-400' : 'bg-orange-500/20 text-orange-400'}`}>
+            {planLabel}
           </span>
         </div>
         <p className="text-sm text-slate-300/80">
           You're signed in and your sessions are being saved.
+          {!isProStatus && (
+            <span> Upgrade to Pro for more features!</span>
+          )}
         </p>
       </div>
 
@@ -394,6 +410,15 @@ function AccountContent({ onClose }: { onClose: () => void }) {
       {/* Actions */}
       <div className="space-y-2 pt-4 border-t border-white/10">
         <button
+          onClick={handleManageBilling}
+          className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-full bg-twilight-ember/20 text-twilight-ember hover:bg-twilight-ember/30 transition-colors disabled:opacity-60"
+          disabled={billingLoading}
+        >
+          <DollarSign className="w-4 h-4" />
+          <span className="text-sm font-medium">{billingLoading ? "Opening billing..." : "Manage Billing"}</span>
+        </button>
+
+        <button
           onClick={handleSignOut}
           className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-full bg-twilight-blush/20 text-twilight-blush hover:bg-twilight-blush/30 transition-colors"
         >
@@ -402,7 +427,7 @@ function AccountContent({ onClose }: { onClose: () => void }) {
         </button>
 
         <p className="text-center text-xs text-slate-300/50">
-          Signing out will return you to the welcome screen
+          Signing out will return you to a guest session.
         </p>
       </div>
     </div>
@@ -411,6 +436,16 @@ function AccountContent({ onClose }: { onClose: () => void }) {
 
 export function CornerstoneMenu(props: CornerstoneMenuProps) {
   const [activeTab, setActiveTab] = useState("players");
+  const router = useRouter(); // Initialize useRouter
+
+  const handleTabClick = (tabName: string) => {
+    if (tabName === "pricing") {
+      router.push('/pricing');
+      props.onClose(); // Close menu when navigating
+    } else {
+      setActiveTab(tabName);
+    }
+  };
 
   return (
     <AnimatePresence>
@@ -435,25 +470,31 @@ export function CornerstoneMenu(props: CornerstoneMenuProps) {
             <header className="flex items-center justify-between border-b border-white/10 p-4">
               <div className="flex items-center gap-4">
                 <button
-                  onClick={() => setActiveTab("players")}
+                  onClick={() => handleTabClick("players")}
                   className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm transition ${activeTab === "players" ? "bg-white/10 text-white" : "text-slate-300/70 hover:bg-white/5"}`}>
                   <Users className="h-4 w-4" />
                   <span>Players</span>
                 </button>
                 <button
-                  onClick={() => setActiveTab("avatar")}
+                  onClick={() => handleTabClick("avatar")}
                   className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm transition ${activeTab === "avatar" ? "bg-white/10 text-white" : "text-slate-300/70 hover:bg-white/5"}`}>
                   <Palette className="h-4 w-4" />
                   <span>Avatar</span>
                 </button>
                 <button
-                  onClick={() => setActiveTab("account")}
+                  onClick={() => handleTabClick("account")}
                   className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm transition ${activeTab === "account" ? "bg-white/10 text-white" : "text-slate-300/70 hover:bg-white/5"}`}>
                   <UserCircle className="h-4 w-4" />
                   <span>Account</span>
                 </button>
                 <button
-                  onClick={() => setActiveTab("lobbies")}
+                  onClick={() => handleTabClick("pricing")} // New Pricing Button
+                  className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm transition ${activeTab === "pricing" ? "bg-white/10 text-white" : "text-slate-300/70 hover:bg-white/5"}`}>
+                  <DollarSign className="h-4 w-4" />
+                  <span>Pricing</span>
+                </button>
+                <button
+                  onClick={() => handleTabClick("lobbies")}
                   className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm transition ${activeTab === "lobbies" ? "bg-white/10 text-white" : "text-slate-300/70 hover:bg-white/5"}`}>
                   <LayoutGrid className="h-4 w-4" />
                   <span>Lobbies</span>
@@ -481,7 +522,8 @@ export function CornerstoneMenu(props: CornerstoneMenuProps) {
             <main className="flex-1 overflow-hidden p-6">
               {activeTab === "players" && <PlayersContent participants={props.participants} onlineCount={props.onlineCount} />}
               {activeTab === "avatar" && <AvatarContent {...props} />}
-              {activeTab === "account" && <AccountContent onClose={props.onClose} />}
+              {activeTab === "account" && <AccountContent user={props.user} toggleAuthModal={props.toggleAuthModal} onClose={props.onClose} displayName={props.displayName} subscriptionStatus={props.subscriptionStatus} />}
+              {activeTab === "pricing" && <PricingContent onClose={props.onClose} />}
               {activeTab === "lobbies" && <div className="text-slate-400">Lobby switching coming soon.</div>}
               {activeTab === "about" && <AboutContent onlineCount={props.onlineCount} displayName={props.displayName} />}
               {activeTab === "settings" && <SettingsContent {...props} />}
@@ -490,5 +532,27 @@ export function CornerstoneMenu(props: CornerstoneMenuProps) {
         </motion.div>
       )}
     </AnimatePresence>
+  );
+}
+
+function PricingContent({ onClose }: { onClose: () => void }) {
+  const router = useRouter();
+
+  const handleGoToPricing = () => {
+    router.push('/pricing');
+    onClose();
+  };
+
+  return (
+    <div className="flex flex-col items-center justify-center h-full space-y-4 text-parchment">
+      <h3 className="text-xl font-bold">Manage Your Plan</h3>
+      <p className="text-text-muted">View pricing options and upgrade.</p>
+      <button
+        onClick={handleGoToPricing}
+        className="rounded-full bg-twilight-ember/90 px-6 py-3 text-sm font-semibold text-twilight shadow-[0_18px_36px_rgba(252,211,77,0.45)] transition hover:scale-[1.02] active:scale-[0.98]"
+      >
+        Go to Pricing Page
+      </button>
+    </div>
   );
 }

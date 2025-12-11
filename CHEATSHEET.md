@@ -1,4 +1,4 @@
-# CozyFocus Cheat Sheet
+# StudyHarbor Cheat Sheet
 
 **Keep this open while coding!**
 

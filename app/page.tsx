@@ -1,101 +1,50 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { RealtimeChannel } from "@supabase/supabase-js";
 import { useShallow } from "zustand/react/shallow";
-import { Moon, Eye } from "lucide-react";
+import { Moon } from "lucide-react";
 import { motion } from "framer-motion";
 
+import { usePresenceManager } from "@/components/lounge/usePresenceManager";
+import { useTimerSync } from "@/components/lounge/useTimerSync";
 import { AmbientPlayer, AmbientPlayerHandle } from "@/components/AmbientPlayer";
 import { AvatarDrawer } from "@/components/AvatarDrawer";
 import { AvatarSprite } from "@/components/AvatarSprite";
 import { CornerstoneMenu } from "@/components/CornerstoneMenu";
+import AuthModal from "@/components/AuthModal";
 import { PomodoroPanel } from "@/components/PomodoroPanel";
 import { SharedAura } from "@/components/SharedAura";
 import { Toast } from "@/components/Toast";
 import { UnifiedWelcomeModal } from "@/components/UnifiedWelcomeModal";
-import { supabase } from "@/lib/supabaseClient";
-import type { AvatarPresence, RenderAvatar, TimerState } from "@/lib/types";
-import {
-  approach,
-  createDisplayName,
-  createGuestId,
-  lerp,
-  pickAvatarColor,
-} from "@/lib/utils";
+import type { Identity, TimerState } from "@/lib/types";
+import { approach, clampNormalized, lerp, pickAvatarColor } from "@/lib/utils";
 import { useUIStore } from "@/lib/state/uiStore";
 import styles from './Home.module.css';
-
-type RemoteAvatarState = {
-  color: string;
-  name: string;
-  x: number;
-  y: number;
-  targetX: number;
-  targetY: number;
-  status?: string;
-};
-
-const DEFAULT_FOCUS_DURATION_MS = 25 * 60 * 1000;
-const MOVE_SPEED = 0.13; // normalized units per second
-const REMOTE_SMOOTHING = 0.18;
-const PRESENCE_BROADCAST_INTERVAL_MS = 120;
-const TIMER_BROADCAST_INTERVAL_MS = 1000;
-
-const clampNormalized = (value: number) => Math.min(1, Math.max(0, value));
-const IDENTITY_STORAGE_KEY = "cozyfocus.identity";
-
-const createInitialTimerState = (
-  mode: TimerState["mode"] = "solo",
-  focusDuration: number = DEFAULT_FOCUS_DURATION_MS
-): TimerState => ({
-  mode,
-  phase: "focus",
-  remainingMs: focusDuration,
-  isRunning: false,
-  lastUpdatedAt: Date.now(),
-});
+import { useIdentityManager } from "@/components/lounge/useIdentityManager";
+import { identifyUser } from "@/lib/analytics/posthogClient";
+import { events } from "@/lib/analytics/events";
 
 export default function HomePage() {
-  const [identity, setIdentity] = useState<{
-    guestId: string;
-    displayName: string;
-    color: string;
-  } | null>(null);
-  const [showWelcome, setShowWelcome] = useState(false);
-
-  const displayName = identity?.displayName ?? "Settling Wanderer";
+  const {
+    identity,
+    user,
+    showWelcome,
+    setShowWelcome,
+    handleWelcomeConfirm: confirmIdentity,
+    handleContinueAsGuest: continueAsGuest,
+    displayName,
+    syncIdentityColor,
+  } = useIdentityManager();
 
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const channelRef = useRef<RealtimeChannel | null>(null);
-  const presenceReadyRef = useRef(false);
-
-  const animationRef = useRef<number | null>(null);
-  const lastFrameRef = useRef<number | null>(null);
-  const lastPresenceBroadcastRef = useRef(0);
-  const lastTimerBroadcastRef = useRef(0);
-
-  const localPositionRef = useRef({ x: 0.5, y: 0.68 });
   const targetPositionRef = useRef({ x: 0.5, y: 0.68 });
-  const remoteAvatarsRef = useRef<Map<string, RemoteAvatarState>>(new Map());
-
-  const hoveredAvatarRef = useRef<string | null>(null);
-  const syncingColorRef = useRef(false);
-
-  const [avatars, setAvatars] = useState<RenderAvatar[]>([]);
-  const [hoveredAvatarId, setHoveredAvatarId] = useState<string | null>(null);
-  const [onlineCount, setOnlineCount] = useState(0);
+  
   const [isCornerstoneMenuOpen, setIsCornerstoneMenuOpen] = useState(false);
   const [isAvatarDrawerOpen, setIsAvatarDrawerOpen] = useState(false);
-  const [parallax, setParallax] = useState({ x: 0, y: 0 });
   const [status, setStatus] = useState("");
   const [isStatusShared, setIsStatusShared] = useState(false);
-  const parallaxTargetRef = useRef({ x: 0, y: 0 });
-  const parallaxFrameRef = useRef<number | null>(null);
-  const [toastMessage, setToastMessage] = useState("");
-  const [toastColor, setToastColor] = useState<string | undefined>(undefined);
-  const [toastVisible, setToastVisible] = useState(false);
-  const previousPresenceIdsRef = useRef<Set<string>>(new Set());
+
+  const [toast, setToast] = useState<{ message: string, color?: string, visible: boolean }>({ message: '', visible: false });
 
   const {
     avatarColor,
@@ -106,6 +55,8 @@ export default function HomePage() {
     setFocusSessionMinutes,
     breakSessionMinutes,
     setBreakSessionMinutes,
+    isAuthModalOpen,
+    toggleAuthModal,
   } = useUIStore(
     useShallow((state) => ({
       avatarColor: state.avatarColor,
@@ -116,77 +67,66 @@ export default function HomePage() {
       setFocusSessionMinutes: state.setFocusSessionMinutes,
       breakSessionMinutes: state.breakSessionMinutes,
       setBreakSessionMinutes: state.setBreakSessionMinutes,
+      isAuthModalOpen: state.isAuthModalOpen,
+      toggleAuthModal: state.toggleAuthModal,
     }))
   );
+
+  const handleToast = useCallback((message: string, color?: string) => {
+    setToast({ message, color, visible: true });
+  }, []);
+
+  const { avatars, onlineCount, handleHoverChange, connectionStatus } = usePresenceManager({
+    identity,
+    showWelcome,
+    isStatusShared,
+    status,
+    containerRef,
+    targetPositionRef,
+    onToast: handleToast,
+  });
+  
+  const syncingColorRef = useRef(false);
+
   const focusDurationMs = focusSessionMinutes * 60 * 1000;
   const breakDurationMs = breakSessionMinutes * 60 * 1000;
 
-  const [timerState, setTimerState] = useState<TimerState>(() =>
-    createInitialTimerState("solo", focusDurationMs)
-  );
-  const timerRef = useRef<TimerState>(timerState);
-  const sharedTimerSnapshotRef = useRef<TimerState | null>(null);
   const ambientPlayerRef = useRef<AmbientPlayerHandle | null>(null);
 
-  useEffect(() => {
-    hoveredAvatarRef.current = hoveredAvatarId;
-  }, [hoveredAvatarId]);
+  const {
+    timerState,
+    handleToggleMode,
+    handleStartStop,
+    handleResetTimer,
+    handleSkipPhase,
+  } = useTimerSync({
+    identity,
+    showWelcome,
+    focusDurationMs,
+    breakDurationMs,
+  });
 
-  useEffect(() => {
-    if (identity !== null) return;
-    if (typeof window === "undefined") return;
+  const ensureAmbientPlayback = useCallback(() => {
+    void ambientPlayerRef.current?.ensurePlayback();
+  }, []);
 
-    const stored = window.localStorage.getItem(IDENTITY_STORAGE_KEY);
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored) as {
-          guestId: string;
-          displayName: string;
-          color: string;
-        };
-        if (parsed?.guestId && parsed?.displayName && parsed?.color) {
-          setIdentity(parsed);
-          setShowWelcome(false);
-          return;
-        }
-      } catch (error) {
-        console.warn("Failed to parse stored identity", error);
-      }
+  const handleStartStopWithSound = useCallback(() => {
+    const starting = !timerState.isRunning;
+    if (starting) {
+      events.timerStart({ mode: timerState.mode, phase: timerState.phase });
+    } else {
+      events.timerPause({ mode: timerState.mode, phase: timerState.phase });
     }
+    ensureAmbientPlayback();
+    handleStartStop();
+  }, [ensureAmbientPlayback, handleStartStop, timerState.isRunning, timerState.mode, timerState.phase]);
 
-    // Check for authenticated user first
-    const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-
-      if (session?.user) {
-        // User is authenticated!
-        console.log('[Auth] Authenticated user detected:', session.user.email);
-        setIdentity({
-          guestId: session.user.id, // Use real user ID
-          displayName: session.user.user_metadata?.display_name || session.user.email?.split('@')[0] || 'User',
-          color: session.user.user_metadata?.avatar_color || pickAvatarColor(),
-        });
-        setShowWelcome(false); // Skip welcome modal
-        return;
-      }
-
-      // Not authenticated - proceed with guest flow
-      setIdentity({
-        guestId: createGuestId(),
-        displayName: createDisplayName(),
-        color: pickAvatarColor(),
-      });
-      setShowWelcome(true);
-    };
-
-    checkAuth();
-  }, [identity]);
-
-  useEffect(() => {
-    if (!identity || typeof window === "undefined") return;
-    if (showWelcome) return;
-    window.localStorage.setItem(IDENTITY_STORAGE_KEY, JSON.stringify(identity));
-  }, [identity, showWelcome]);
+  const handleToggleModeWithTracking = useCallback(() => {
+    events.timerModeToggle({
+      nextMode: timerState.mode === "solo" ? "shared" : "solo",
+    });
+    handleToggleMode();
+  }, [handleToggleMode, timerState.mode]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -214,6 +154,11 @@ export default function HomePage() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!identity) return;
+    identifyUser({ id: identity.guestId, kind: user ? "user" : "guest" });
+  }, [identity?.guestId, user]);
+
   const hasSyncedIdentityColorRef = useRef<string | null>(null);
   useEffect(() => {
     if (!identity?.color || !identity.guestId) return;
@@ -230,143 +175,9 @@ export default function HomePage() {
       return;
     }
     syncingColorRef.current = true;
-    setIdentity((prev) => {
-      if (!prev) {
-        syncingColorRef.current = false;
-        return prev;
-      }
-      syncingColorRef.current = false;
-      return { ...prev, color: avatarColor };
-    });
-  }, [avatarColor]);
-
-  useEffect(() => {
-    timerRef.current = timerState;
-  }, [timerState]);
-
-  useEffect(() => {
-    setTimerState((prev) => {
-      if (prev.phase !== "focus") return prev;
-      const targetRemaining = prev.isRunning
-        ? Math.min(prev.remainingMs, focusDurationMs)
-        : focusDurationMs;
-      if (targetRemaining === prev.remainingMs) {
-        return prev;
-      }
-      const next: TimerState = {
-        ...prev,
-        remainingMs: targetRemaining,
-        lastUpdatedAt: Date.now(),
-      };
-      timerRef.current = next;
-      if (next.mode === "shared") {
-        sharedTimerSnapshotRef.current = next;
-      }
-      return next;
-    });
-  }, [focusDurationMs]);
-
-
-  const updateTimerState = useCallback(
-    (
-      updater: (prev: TimerState) => TimerState,
-      options: { broadcast?: boolean } = {}
-    ) => {
-      const shouldBroadcast = options.broadcast ?? true;
-      const base = { ...timerRef.current };
-      let next = updater(base);
-      const stamped = { ...next, lastUpdatedAt: Date.now() };
-      timerRef.current = stamped;
-      setTimerState(stamped);
-      if (shouldBroadcast && stamped.mode === "shared") {
-        sharedTimerSnapshotRef.current = stamped;
-        lastTimerBroadcastRef.current = stamped.lastUpdatedAt;
-        channelRef.current?.send({
-          type: "broadcast",
-          event: "timer:update",
-          payload: stamped,
-        });
-      }
-      return stamped;
-    },
-    []
-  );
-
-  const ensureAmbientPlayback = useCallback(() => {
-    void ambientPlayerRef.current?.ensurePlayback();
-  }, []);
-
-  const handleToggleMode = useCallback(() => {
-    if (!identity || showWelcome) return;
-    const requesterId = identity.guestId;
-    const previousSnapshot = sharedTimerSnapshotRef.current;
-    const next = updateTimerState(
-      (prev) => {
-        if (prev.mode === "shared") {
-          return createInitialTimerState("solo", focusDurationMs);
-        }
-        const snapshot = sharedTimerSnapshotRef.current;
-        if (snapshot) {
-          return { ...snapshot, mode: "shared" };
-        }
-        return createInitialTimerState("shared", focusDurationMs);
-      },
-      { broadcast: false }
-    );
-
-    if (next.mode === "shared") {
-      const hadSnapshot = Boolean(previousSnapshot);
-      sharedTimerSnapshotRef.current = next;
-      channelRef.current?.send({
-        type: "broadcast",
-        event: "timer:request-sync",
-        payload: { requesterId },
-      });
-
-      if (!hadSnapshot) {
-        channelRef.current?.send({
-          type: "broadcast",
-          event: "timer:update",
-          payload: next,
-        });
-      }
-    } else {
-      sharedTimerSnapshotRef.current = null;
-    }
-  }, [focusDurationMs, identity, showWelcome, updateTimerState]);
-
-  const handleStartStop = useCallback(() => {
-    ensureAmbientPlayback();
-    updateTimerState((prev) => ({
-      ...prev,
-      isRunning: !prev.isRunning,
-    }));
-  }, [ensureAmbientPlayback, updateTimerState]);
-
-  const handleResetTimer = useCallback(() => {
-    updateTimerState(
-      (prev) => ({
-        ...prev,
-        phase: "focus",
-        remainingMs: focusDurationMs,
-        isRunning: false,
-      }),
-      { broadcast: true }
-    );
-  }, [focusDurationMs, updateTimerState]);
-
-  const handleSkipPhase = useCallback(() => {
-    updateTimerState((prev) => {
-      const nextPhase = prev.phase === "focus" ? "break" : "focus";
-      const duration =
-        nextPhase === "focus" ? focusDurationMs : breakDurationMs;
-      return {
-        ...prev,
-        phase: nextPhase,
-        remainingMs: duration,
-      };
-    });
-  }, [breakDurationMs, focusDurationMs, updateTimerState]);
+    syncIdentityColor(avatarColor);
+    syncingColorRef.current = false;
+  }, [avatarColor, syncIdentityColor]);
 
   const setTargetFromPoint = useCallback((clientX: number, clientY: number) => {
     const container = containerRef.current;
@@ -395,284 +206,7 @@ export default function HomePage() {
     },
     [setTargetFromPoint]
   );
-
-  const handleHoverChange = useCallback((avatarId: string, hovering: boolean) => {
-    setHoveredAvatarId((prev) => {
-      if (hovering) {
-        return avatarId;
-      }
-      return prev === avatarId ? null : prev;
-    });
-  }, []);
-
-  useEffect(() => {
-    if (!identity || showWelcome) {
-      return;
-    }
-
-    const { guestId: resolvedGuestId, displayName: resolvedName, color: resolvedColor } = identity;
-
-    const channel = supabase.channel("cozyfocus-room", {
-      config: { presence: { key: resolvedGuestId } },
-    });
-
-    channelRef.current = channel;
-
-    const handlePresenceSync = () => {
-      const presenceState = channel.presenceState<AvatarPresence>();
-      const nextRemotes = new Map<string, RemoteAvatarState>();
-      const currentPresenceIds = new Set<string>();
-      let participantCount = 0; // Initialize to 0
-
-      Object.values(presenceState).forEach((connections) => {
-        connections.forEach((presence) => {
-          if (!presence?.id) return; // Always skip invalid presence
-          if (presence.id === resolvedGuestId) return; // Skip local user
-          
-          participantCount++; // Only increment for remote users
-          currentPresenceIds.add(presence.id);
-          const normalizedX = clampNormalized(presence.x);
-          const normalizedY = clampNormalized(presence.y);
-          const existing = remoteAvatarsRef.current.get(presence.id);
-          nextRemotes.set(
-            presence.id,
-            existing
-              ? {
-                  ...existing,
-                  color: presence.color,
-                  name: presence.name ?? "Wanderer",
-                  targetX: normalizedX,
-                  targetY: normalizedY,
-                  status: presence.status,
-                }
-              : {
-                  color: presence.color,
-                  name: presence.name ?? "Wanderer",
-                  x: normalizedX,
-                  y: normalizedY,
-                  targetX: normalizedX,
-                  targetY: normalizedY,
-                  status: presence.status,
-                }
-          );
-        });
-      });
-
-      if (previousPresenceIdsRef.current.size > 0) {
-        currentPresenceIds.forEach((id) => {
-          if (!previousPresenceIdsRef.current.has(id)) {
-            const newcomer = nextRemotes.get(id);
-            if (newcomer) {
-              setToastMessage(`${newcomer.name} joined 💛`);
-              setToastColor(newcomer.color);
-              setToastVisible(true);
-            }
-          }
-        });
-
-        previousPresenceIdsRef.current.forEach((id) => {
-          if (!currentPresenceIds.has(id)) {
-            const leaver = remoteAvatarsRef.current.get(id);
-            if (leaver) {
-              setToastMessage(`${leaver.name} left`);
-              setToastColor(leaver.color);
-              setToastVisible(true);
-            }
-          }
-        });
-      }
-
-      previousPresenceIdsRef.current = currentPresenceIds;
-      remoteAvatarsRef.current = nextRemotes;
-      setOnlineCount(participantCount);
-    };
-
-    channel.on("presence", { event: "sync" }, handlePresenceSync);
-
-    channel.on("broadcast", { event: "timer:update" }, ({ payload }) => {
-      if (!payload) return;
-      const incoming = payload as TimerState;
-      const normalized: TimerState = {
-        ...incoming,
-        mode: "shared",
-        lastUpdatedAt: Date.now(),
-      };
-      sharedTimerSnapshotRef.current = normalized;
-      if (timerRef.current.mode === "shared") {
-        timerRef.current = normalized;
-        setTimerState(normalized);
-      }
-    });
-
-    channel.on("broadcast", { event: "timer:request-sync" }, () => {
-      if (timerRef.current.mode === "shared") {
-        const snapshot = { ...timerRef.current, lastUpdatedAt: Date.now() };
-        sharedTimerSnapshotRef.current = snapshot;
-        lastTimerBroadcastRef.current = snapshot.lastUpdatedAt;
-        channel.send({
-          type: "broadcast",
-          event: "timer:update",
-          payload: snapshot,
-        });
-      }
-    });
-
-    channel.subscribe((status) => {
-      if (status === "SUBSCRIBED") {
-        channel
-          .track({
-            id: resolvedGuestId,
-            name: resolvedName,
-            color: resolvedColor,
-            x: localPositionRef.current.x,
-            y: localPositionRef.current.y,
-            updatedAt: Date.now(),
-          })
-          .then(() => {
-            presenceReadyRef.current = true;
-          });
-      }
-    });
-
-    return () => {
-      presenceReadyRef.current = false;
-      channel.unsubscribe();
-      channelRef.current = null;
-      remoteAvatarsRef.current.clear();
-    };
-  }, [identity, setTimerState, showWelcome]);
-
-  useEffect(() => {
-    if (!identity || showWelcome) {
-      return;
-    }
-
-    const { guestId: resolvedGuestId, displayName: resolvedName, color: resolvedColor } = identity;
-
-    const tick = (frameTime: number) => {
-      const previous = lastFrameRef.current ?? frameTime;
-      const deltaSeconds = Math.min(0.12, (frameTime - previous) / 1000);
-      lastFrameRef.current = frameTime;
-
-      const container = containerRef.current;
-      const width =
-        container?.clientWidth ??
-        (typeof window !== "undefined" ? window.innerWidth : 1);
-      const height =
-        container?.clientHeight ??
-        (typeof window !== "undefined" ? window.innerHeight : 1);
-
-      const localPosition = localPositionRef.current;
-      const target = targetPositionRef.current;
-
-      if (deltaSeconds > 0) {
-        localPosition.x = approach(
-          localPosition.x,
-          target.x,
-          MOVE_SPEED * deltaSeconds
-        );
-        localPosition.y = approach(
-          localPosition.y,
-          target.y,
-          MOVE_SPEED * deltaSeconds
-        );
-      }
-
-      const nowMs = Date.now();
-      if (
-        presenceReadyRef.current &&
-        channelRef.current &&
-        nowMs - lastPresenceBroadcastRef.current > PRESENCE_BROADCAST_INTERVAL_MS
-      ) {
-        channelRef.current.track({
-          id: resolvedGuestId,
-          name: resolvedName,
-          color: resolvedColor,
-          x: localPosition.x,
-          y: localPosition.y,
-          updatedAt: nowMs,
-          status: isStatusShared ? status : undefined,
-        });
-        lastPresenceBroadcastRef.current = nowMs;
-      }
-
-      const hoveredId = hoveredAvatarRef.current;
-      const renderList: RenderAvatar[] = [
-        {
-          id: resolvedGuestId,
-          color: resolvedColor,
-          name: resolvedName,
-          x: localPosition.x * width,
-          y: localPosition.y * height,
-          isSelf: true,
-          isHovered: hoveredId === resolvedGuestId,
-          status: isStatusShared ? status : undefined,
-        },
-      ];
-
-      remoteAvatarsRef.current.forEach((avatar, id) => {
-        avatar.x = lerp(avatar.x, avatar.targetX, REMOTE_SMOOTHING);
-        avatar.y = lerp(avatar.y, avatar.targetY, REMOTE_SMOOTHING);
-        renderList.push({
-          id,
-          color: avatar.color,
-          name: avatar.name,
-          x: avatar.x * width,
-          y: avatar.y * height,
-          isSelf: false,
-          isHovered: hoveredId === id,
-          status: avatar.status,
-        });
-      });
-
-      setAvatars(renderList);
-
-      const timer = timerRef.current;
-      if (timer.isRunning) {
-        const elapsed = nowMs - timer.lastUpdatedAt;
-        if (elapsed >= 250) {
-          let remaining = Math.max(0, timer.remainingMs - elapsed);
-          let phase = timer.phase;
-          if (remaining === 0) {
-            phase = timer.phase === "focus" ? "break" : "focus";
-            remaining =
-              phase === "focus" ? focusDurationMs : breakDurationMs;
-          }
-          const updatedTimer: TimerState = {
-            ...timer,
-            remainingMs: remaining,
-            phase,
-            lastUpdatedAt: nowMs,
-          };
-          timerRef.current = updatedTimer;
-          setTimerState(updatedTimer);
-          if (
-            updatedTimer.mode === "shared" &&
-            nowMs - lastTimerBroadcastRef.current >=
-              TIMER_BROADCAST_INTERVAL_MS
-          ) {
-            lastTimerBroadcastRef.current = nowMs;
-            sharedTimerSnapshotRef.current = updatedTimer;
-            channelRef.current?.send({
-              type: "broadcast",
-              event: "timer:update",
-              payload: updatedTimer,
-            });
-          }
-        }
-      }
-
-      animationRef.current = requestAnimationFrame(tick);
-    };
-
-    animationRef.current = requestAnimationFrame(tick);
-    return () => {
-      if (animationRef.current !== null) {
-        cancelAnimationFrame(animationRef.current);
-      }
-    };
-  }, [breakDurationMs, focusDurationMs, identity, setTimerState, showWelcome]);
-
+  
   const sharedActive = timerState.mode === "shared" && !showWelcome;
   const sharedParticipants = useMemo(
     () => avatars.filter((avatar) => !avatar.isSelf),
@@ -693,45 +227,54 @@ export default function HomePage() {
   }, [avatars, sharedActive, timerState]);
 
   const handleWelcomeConfirm = useCallback(
-    ({ displayName: nextName, color: nextColor }: { displayName: string; color: string }) => {
-      const trimmedName = nextName.trim();
-      if (!trimmedName) return;
-      setIdentity((prev) => {
-        const base = prev ?? {
-          guestId: createGuestId(),
-          displayName: trimmedName,
-          color: nextColor,
-        };
-        const nextIdentity = {
-          ...base,
-          displayName: trimmedName,
-          color: nextColor,
-        };
-        if (typeof window !== "undefined") {
-          window.localStorage.setItem(IDENTITY_STORAGE_KEY, JSON.stringify(nextIdentity));
-        }
-        return nextIdentity;
-      });
+    ({ displayName, color }: { displayName: string; color: string }) => {
+      confirmIdentity({ displayName, color });
       setShowWelcome(false);
     },
-    []
+    [confirmIdentity, setShowWelcome]
   );
+
+  const handleAuthSuccess = () => {
+    toggleAuthModal(false);
+    // onAuthStateChange will handle updating the user and identity state.
+  };
+
+  const handleContinueAsGuest = () => {
+    toggleAuthModal(false);
+    continueAsGuest();
+  };
+
+  const connectionLabel = useMemo(() => {
+    switch (connectionStatus) {
+      case "connected":
+        return "Connected";
+      case "connecting":
+        return "Connecting…";
+      case "error":
+        return "Reconnecting…";
+      default:
+        return "Idle";
+    }
+  }, [connectionStatus]);
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-twilight text-slate-100">
+      <div className="fixed left-4 top-4 z-30 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-parchment shadow-glass-sm backdrop-blur">
+        Presence: {connectionLabel}
+      </div>
       <div
         ref={containerRef}
         className={`relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-cover bg-center transition duration-500 ${
-          showWelcome ? "pointer-events-none scale-[0.98] blur-[1.5px]" : ""
+          showWelcome || isAuthModalOpen ? "pointer-events-none scale-[0.98] blur-[1.5px]" : ""
         }`}
         style={{ backgroundImage: "url('/lofi.gif')" }}
         onPointerDown={handleScenePointerDown}
         onPointerMove={handleScenePointerMove}
         onPointerUp={handleScenePointerDown}
         role="application"
-        aria-label="Cozy shared space. Click to move your avatar."
-        aria-hidden={showWelcome}
-      >
+        aria-label="StudyHarbor shared space. Click to move your avatar."
+        aria-hidden={showWelcome || isAuthModalOpen}
+>
         <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(15,23,42,0.85)_0%,rgba(15,23,42,0.55)_35%,rgba(15,23,42,0.85)_100%)] mix-blend-multiply" />
         <div className="pointer-events-none absolute inset-0 -m-[30%] animate-aurora-drift bg-[radial-gradient(circle_at_22%_25%,rgba(251,191,36,0.14),transparent_45%),radial-gradient(circle_at_80%_30%,rgba(96,165,250,0.2),transparent_55%),radial-gradient(circle_at_50%_75%,rgba(248,113,113,0.18),transparent_50%)] blur-[40px] opacity-85" />
 
@@ -775,7 +318,7 @@ export default function HomePage() {
               color={avatar.color}
               name={avatar.name}
               isSelf={avatar.isSelf}
-              isHovered={avatar.isHovered}
+              isHovered={!!avatar.isHovered}
               status={avatar.status}
               onHoverChange={(hovering) =>
                 handleHoverChange(avatar.id, hovering)
@@ -797,8 +340,8 @@ export default function HomePage() {
             focusDurationMs={focusDurationMs}
             breakDurationMs={breakDurationMs}
             isRunning={timerState.isRunning}
-            onToggleMode={handleToggleMode}
-            onStartStop={handleStartStop}
+            onToggleMode={handleToggleModeWithTracking}
+            onStartStop={handleStartStopWithSound}
             onReset={handleResetTimer}
             onSkipPhase={handleSkipPhase}
             sharedActive={sharedActive}
@@ -819,6 +362,9 @@ export default function HomePage() {
       <CornerstoneMenu
         open={isCornerstoneMenuOpen}
         onClose={() => setIsCornerstoneMenuOpen(false)}
+        user={user}
+        toggleAuthModal={toggleAuthModal}
+        subscriptionStatus={identity?.subscription_status ?? 'free'}
         ambientVolume={ambientVolume}
         onAmbientVolumeChange={setAmbientVolume}
         focusSessionMinutes={focusSessionMinutes}
@@ -847,11 +393,17 @@ export default function HomePage() {
           onConfirm={handleWelcomeConfirm}
         />
       )}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => toggleAuthModal(false)}
+        onAuthSuccess={handleAuthSuccess}
+        onContinueAsGuest={handleContinueAsGuest}
+      />
       <Toast
-        message={toastMessage}
-        visible={toastVisible}
-        onDismiss={() => setToastVisible(false)}
-        color={toastColor}
+        message={toast.message}
+        visible={toast.visible}
+        onDismiss={() => setToast(prev => ({ ...prev, visible: false }))}
+        color={toast.color}
         duration={3000}
       />
     </main>

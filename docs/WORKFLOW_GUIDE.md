@@ -399,13 +399,13 @@ Create a [ComponentName] component that:
 ### README Template
 
 ```markdown
-# CozyFocus
+# StudyHarbor
 
 > Real-time collaborative Pomodoro timer with social presence
 
 [Demo GIF]
 
-🔗 [Live Demo](https://cozyfocus.vercel.app) | 📖 [Docs](./docs)
+🔗 [Live Demo](https://studyharbor.vercel.app) | 📖 [Docs](./docs)
 
 ## Tech Stack
 
@@ -627,7 +627,7 @@ Adjustments:
 
 **Template Tweet:**
 ```
-Day [X] building CozyFocus 🚀
+Day [X] building StudyHarbor 🚀
 
 Shipped today:
 ✅ [feature]

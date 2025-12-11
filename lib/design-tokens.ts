@@ -1,5 +1,5 @@
 /**
- * CozyFocus Design Tokens
+ * StudyHarbor Design Tokens
  *
  * Central source of truth for all design values.
  * Extracted from globals.css and tailwind.config.js

@@ -1,5 +1,5 @@
 /**
- * CozyFocus Authentication Service
+ * StudyHarbor Authentication Service
  *
  * Handles all auth operations with Supabase.
  * Provides a clean interface for signup, login, and session management.

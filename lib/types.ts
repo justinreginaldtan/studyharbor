@@ -1,3 +1,10 @@
+export type Identity = {
+  guestId: string;
+  displayName: string;
+  color: string;
+  subscription_status?: string;
+};
+
 export type AvatarPresence = {
   id: string;
   color: string;

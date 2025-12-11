@@ -9,6 +9,13 @@ export const COZY_AVATAR_COLORS = [
   "#A5F3FC",
 ] as const;
 
+/**
+ * Clamp a normalized value to the 0–1 range.
+ */
+export function clampNormalized(value: number) {
+  return Math.min(1, Math.max(0, value));
+}
+
 const COZY_FIRST_WORDS = [
   "Mellow",
   "Dreamy",

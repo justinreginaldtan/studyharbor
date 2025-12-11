@@ -1,4 +1,4 @@
-# CozyFocus Quick Reference Sheet
+# StudyHarbor Quick Reference Sheet
 
 **Your daily command center for the 2-week sprint**
 
@@ -78,7 +78,7 @@ cozylands_v0.1/
 ├── components/                   # React components
 │   ├── AvatarSprite.tsx          # Pixel art avatars
 │   ├── PomodoroPanel.tsx         # Timer UI
-│   └── CozyRoom/                 # Refactored room components (Week 1)
+│   └── lounge/                   # Presence, timer, identity hooks
 │
 ├── lib/                          # Utilities & services
 │   ├── auth/
@@ -92,7 +92,7 @@ cozylands_v0.1/
 │   ├── SPRINT_PLAN.md            # 2-week roadmap
 │   ├── ARCHITECTURE.md           # Technical guide
 │   ├── WORKFLOW_GUIDE.md         # AI workflow tips
-│   └── cozyfocus-spec.md         # Design vision
+│   └── studyharbor-spec.md         # Design vision
 │
 ├── DAILY_LOG.md                  # 📝 Your daily progress tracker
 └── .env.local                    # Supabase keys (keep secret!)

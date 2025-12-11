@@ -156,7 +156,18 @@ export function UnifiedWelcomeModal({ open, initialName, initialColor, onConfirm
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(8,14,24,0.78)] backdrop-blur-[22px]">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(8,14,24,0.78)] backdrop-blur-[22px]"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Welcome to StudyHarbor"
+      onKeyDown={(e) => {
+        if (e.key === "Escape") {
+          setAuthMode("signin");
+          setScreen("auth-choice");
+        }
+      }}
+    >
       {/* Aurora background */}
       <div className="pointer-events-none absolute inset-0 -m-[30%] animate-aurora-drift bg-[radial-gradient(circle_at_22%_25%,rgba(251,191,36,0.18),transparent_45%),radial-gradient(circle_at_80%_30%,rgba(96,165,250,0.22),transparent_55%),radial-gradient(circle_at_50%_75%,rgba(248,113,113,0.2),transparent_50%)] blur-[48px] opacity-90" />
 
@@ -223,7 +234,7 @@ export function UnifiedWelcomeModal({ open, initialName, initialColor, onConfirm
         <div className="relative z-10 w-[min(92vw,420px)] space-y-6 rounded-glass border border-white/15 bg-[rgba(15,23,42,0.95)] p-8 shadow-glass-lg backdrop-blur-lounge">
           <header className="space-y-2 text-center">
             <h2 className="text-2xl font-semibold tracking-[0.06em] text-parchment">
-              {authMode === 'signin' ? 'Welcome Back' : 'Join CozyFocus'}
+              {authMode === 'signin' ? 'Welcome Back' : 'Join StudyHarbor'}
             </h2>
             <p className="text-sm leading-relaxed text-slate-100/80">
               {authMode === 'signin'

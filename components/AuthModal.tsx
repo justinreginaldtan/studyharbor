@@ -6,7 +6,7 @@
  * Matches the twilight aesthetic with smooth animations
  */
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { authService, authValidation } from '@/lib/auth/authService';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -30,6 +30,14 @@ export default function AuthModal({
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const emailRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      const frame = requestAnimationFrame(() => emailRef.current?.focus());
+      return () => cancelAnimationFrame(frame);
+    }
+  }, [isOpen]);
 
   const handleEmailAuth = async () => {
     setError('');
@@ -113,10 +121,22 @@ export default function AuthModal({
             exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black/40 backdrop-blur-sm z-modal"
             onClick={onClose}
+            aria-hidden="true"
           />
 
           {/* Modal */}
-          <div className="fixed inset-0 z-modal flex items-center justify-center p-4 pointer-events-none">
+          <div
+            className="fixed inset-0 z-modal flex items-center justify-center p-4 pointer-events-none"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Authentication"
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                e.stopPropagation();
+                onClose();
+              }
+            }}
+          >
             <motion.div
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -129,7 +149,7 @@ export default function AuthModal({
                 {/* Header */}
                 <div className="text-center space-y-2">
                   <h2 className="text-2xl font-bold text-parchment">
-                    Welcome to CozyFocus
+                    Welcome to StudyHarbor
                   </h2>
                   <p className="text-text-muted text-sm">
                     {mode === 'signin'
@@ -158,6 +178,7 @@ export default function AuthModal({
                     </label>
                     <input
                       type="email"
+                      ref={emailRef}
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && handleEmailAuth()}

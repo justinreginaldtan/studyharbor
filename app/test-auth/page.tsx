@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 /**
  * Auth Test Page
@@ -6,7 +6,7 @@
  * Access at: http://localhost:3000/test-auth
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { authService, authValidation } from '@/lib/auth/authService';
 
 export default function TestAuthPage() {
@@ -16,14 +16,14 @@ export default function TestAuthPage() {
   const [user, setUser] = useState<any>(null);
 
   // Check current session on load
-  useState(() => {
+  useEffect(() => {
     authService.getSession().then(({ session }) => {
       if (session) {
         setUser(session.user);
         setStatus(`✅ Already logged in as ${session.user.email}`);
       }
     });
-  });
+  }, []);
 
   const handleSignUp = async () => {
     setStatus('⏳ Signing up...');
@@ -248,7 +248,7 @@ export default function TestAuthPage() {
             href="/"
             className="text-twilight-lagoon text-sm hover:text-twilight-ember transition-colors"
           >
-            ← Back to CozyFocus
+            ← Back to StudyHarbor
           </a>
         </div>
       </div>

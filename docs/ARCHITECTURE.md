@@ -1,4 +1,4 @@
-# CozyFocus Architecture
+# StudyHarbor Architecture
 
 **Status:** Transitioning from MVP → Production-Ready
 **Last Updated:** [Update as you go]
@@ -7,7 +7,7 @@
 
 ## System Overview
 
-CozyFocus is a real-time collaborative Pomodoro timer application with social presence. Users appear as animated avatars in a shared "cozy study lounge" where they can see others focusing alongside them.
+StudyHarbor is a real-time collaborative Pomodoro timer application with social presence. Users appear as animated avatars in a shared "cozy study lounge" where they can see others focusing alongside them.
 
 ### Core Value Proposition
 - **Accountability through presence** - Study alongside others in real-time
@@ -90,7 +90,7 @@ CozyFocus is a real-time collaborative Pomodoro timer application with social pr
 
 #### Identity Storage (localStorage)
 ```typescript
-// Key: "cozyfocus.identity"
+// Key: "studyharbor.identity"
 {
   guestId: "guest-abc123",
   displayName: "Mellow Whisper",
@@ -100,7 +100,7 @@ CozyFocus is a real-time collaborative Pomodoro timer application with social pr
 
 #### UI Preferences (Zustand + localStorage)
 ```typescript
-// Key: "cozyfocus.ui"
+// Key: "studyharbor.ui"
 {
   ambientVolume: 0.5,
   focusSessionMinutes: 25,
@@ -266,18 +266,13 @@ app/
     reset-password/page.tsx     -- Password reset
 
 components/
-  CozyRoom/                     -- Main feature components
-    CozyRoomContainer.tsx       -- Orchestrates room features
-    AvatarCanvas.tsx            -- Canvas rendering
-    RoomParticipants.tsx        -- Participant list
+  lounge/                       -- Room/lobby hooks
     usePresenceManager.ts       -- Presence hook
     useTimerSync.ts             -- Timer sync hook
-    useAvatarRenderer.ts        -- Rendering hook
+    useIdentityManager.ts       -- Identity/profile sync
 
-  Pomodoro/
-    PomodoroPanel.tsx           -- Timer controls
-    TimerDisplay.tsx            -- Timer UI
-    SessionHistory.tsx          -- Session log
+  PomodoroPanel.tsx             -- Timer controls (main panel)
+  AvatarSprite.tsx              -- Avatar rendering
 
   UI/                           -- Reusable UI components
     AmbientPlayer.tsx
@@ -363,7 +358,7 @@ export const useUIStore = create<UIState>()(
       setAmbientVolume: (volume) => set({ ambientVolume: volume }),
       // ...
     }),
-    { name: 'cozyfocus.ui' }
+    { name: 'studyharbor.ui' }
   )
 );
 ```
@@ -691,7 +686,7 @@ export async function canCreateRoom(userId: string): Promise<boolean> {
 **Solution:** requestAnimationFrame loop with refs
 
 ```typescript
-// components/CozyRoom/useAvatarRenderer.ts
+// components/lounge/useAvatarRenderer.ts
 export function useAvatarRenderer(
   localPositionRef: MutableRefObject<Position>,
   remoteAvatarsRef: MutableRefObject<Map<string, RemoteAvatar>>
@@ -751,7 +746,7 @@ const { ambientVolume, setAmbientVolume } = useUIStore(
 ### Component Memoization
 
 ```typescript
-// components/CozyRoom/AvatarSprite.tsx
+// components/AvatarSprite.tsx
 export const AvatarSprite = memo(
   AvatarSpriteComponent,
   (prev, next) => {
@@ -1210,7 +1205,7 @@ This architecture balances simplicity (for 2-week sprint) with professionalism (
 
 For questions or clarifications, refer to:
 - `docs/SPRINT_PLAN.md` - Implementation timeline
-- `docs/cozyfocus-spec.md` - Product requirements
+- `docs/studyharbor-spec.md` - Product requirements
 - Component READMEs (coming soon)
 
 **Last Updated:** [Update as you make architectural changes]

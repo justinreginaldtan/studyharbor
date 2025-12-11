@@ -11,11 +11,13 @@ type UIState = {
   breakSessionMinutes: number;
   avatarColor: string;
   ambientPlaying: boolean;
+  isAuthModalOpen: boolean;
   setAmbientVolume: (volume: number) => void;
   setFocusSessionMinutes: (minutes: number) => void;
   setBreakSessionMinutes: (minutes: number) => void;
   setAvatarColor: (hex: string) => void;
   setAmbientPlaying: (playing: boolean) => void;
+  toggleAuthModal: (isOpen: boolean) => void;
 };
 
 const DEFAULTS: Pick<
@@ -35,11 +37,13 @@ const DEFAULTS: Pick<
 const serverSnapshot: UIState = {
   ...DEFAULTS,
   ambientPlaying: false,
+  isAuthModalOpen: false,
   setAmbientVolume: () => {},
   setFocusSessionMinutes: () => {},
   setBreakSessionMinutes: () => {},
   setAvatarColor: () => {},
   setAmbientPlaying: () => {},
+  toggleAuthModal: () => {},
 };
 
 export const useUIStore = create<UIState>()(
@@ -47,6 +51,7 @@ export const useUIStore = create<UIState>()(
     (set) => ({
       ...DEFAULTS,
       ambientPlaying: false,
+      isAuthModalOpen: false,
       setAmbientVolume: (ambientVolume) =>
         set({
           ambientVolume: Math.max(0, Math.min(1, ambientVolume)),
@@ -57,9 +62,10 @@ export const useUIStore = create<UIState>()(
         set({ breakSessionMinutes }),
       setAvatarColor: (avatarColor) => set({ avatarColor }),
       setAmbientPlaying: (ambientPlaying) => set({ ambientPlaying }),
+      toggleAuthModal: (isAuthModalOpen) => set({ isAuthModalOpen }),
     }),
     {
-      name: "cozyfocus.ui",
+      name: "studyharbor.ui",
       version: 2, // Increment version for schema change
       storage: createJSONStorage(() => localStorage),
     }

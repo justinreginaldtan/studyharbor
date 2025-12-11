@@ -492,6 +492,7 @@ function AvatarSpriteComponent({
       className="absolute pointer-events-auto -translate-x-1/2 -translate-y-1/2 transform transition duration-200 hover:scale-[1.05] focus-visible:scale-[1.05] focus-visible:outline-none"
       style={containerStyle}
       aria-labelledby={labelId}
+      data-testid={isSelf ? "avatar-self" : "avatar-remote"}
       onPointerEnter={() => onHoverChange?.(true)}
       onPointerLeave={() => onHoverChange?.(false)}
       onFocus={() => onHoverChange?.(true)}

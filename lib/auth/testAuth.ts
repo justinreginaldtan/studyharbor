@@ -12,7 +12,7 @@
 import { authService, authValidation } from './authService';
 
 export async function testAuthFlow() {
-  console.log('🧪 Testing CozyFocus Auth Setup...\n');
+  console.log('🧪 Testing StudyHarbor Auth Setup...\n');
 
   // Test 1: Email validation
   console.log('📧 Test 1: Email Validation');

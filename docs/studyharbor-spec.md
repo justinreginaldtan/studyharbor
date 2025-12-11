@@ -1,4 +1,4 @@
-# CozyFocus Design Spec
+# StudyHarbor Design Spec
 
 ## Essence & Intent
 - Dusk-lit study lounge whispering “you’re not alone.”

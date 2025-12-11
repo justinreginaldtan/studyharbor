@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import ErrorBoundary from "@/components/ErrorBoundary"; // Import ErrorBoundary
+import { PosthogProvider } from "@/components/analytics/PosthogProvider";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -9,8 +11,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "CozyFocus",
-  description: "A cozy shared space for gentle real-time collaboration.",
+  title: "StudyHarbor",
+  description: "A cozy shared space for gentle real-time collaboration in StudyHarbor.",
 };
 
 export const viewport: Viewport = {
@@ -25,7 +27,8 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${inter.variable} font-sans antialiased`}>
-        {children}
+        <PosthogProvider />
+        <ErrorBoundary>{children}</ErrorBoundary>
       </body>
     </html>
   );
