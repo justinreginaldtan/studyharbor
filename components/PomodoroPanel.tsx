@@ -35,6 +35,8 @@ type PomodoroPanelProps = {
   onStatusChange: (status: string) => void;
   isStatusShared: boolean;
   onIsStatusSharedChange: (isShared: boolean) => void;
+  // Focus saver mode
+  lowPower?: boolean;
 };
 
 const PHASE_LABEL = {
@@ -43,7 +45,7 @@ const PHASE_LABEL = {
 } as const;
 
 export function PomodoroPanel(props: PomodoroPanelProps) {
-  const [isHovered, setIsHovered] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
   const companionCount = props.companionCount ?? 1;
 
   const totalDurationMs =
@@ -80,13 +82,25 @@ export function PomodoroPanel(props: PomodoroPanelProps) {
     }
   };
 
+  // In low power mode: click to toggle. In normal mode: hover to show.
+  const handleMouseEnter = () => {
+    if (!props.lowPower) setIsOpen(true);
+  };
+  const handleMouseLeave = () => {
+    if (!props.lowPower) setIsOpen(false);
+  };
+  const handleClick = () => {
+    if (props.lowPower) setIsOpen((prev) => !prev);
+  };
+
   return (
     <motion.div
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      onClick={handleClick}
       className="relative flex w-full flex-col items-end"
     >
-        <div className="flex cursor-default items-center gap-3 text-right">
+        <div className={`flex items-center gap-3 text-right ${props.lowPower ? "cursor-pointer" : "cursor-default"}`}>
         <div className="flex flex-col items-end">
           <span className="text-xl font-semibold tracking-tight text-parchment opacity-80 md:text-2xl">
             {formattedTime}
@@ -98,13 +112,18 @@ export function PomodoroPanel(props: PomodoroPanelProps) {
         </div>
 
       <AnimatePresence>
-        {isHovered && (
+        {isOpen && (
           <motion.div
-            initial={{ opacity: 0, y: -10 }}
+            initial={props.lowPower ? false : { opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.2, ease: "easeInOut" }}
-            className="absolute top-full mt-4 w-[300px] rounded-glass border border-white/10 bg-slate-900/50 p-4 shadow-glass-lg backdrop-blur-lg"
+            exit={props.lowPower ? undefined : { opacity: 0, y: -10 }}
+            transition={props.lowPower ? { duration: 0 } : { duration: 0.2, ease: "easeInOut" }}
+            className={`absolute top-full mt-4 w-[300px] rounded-glass border border-white/10 p-4 ${
+              props.lowPower
+                ? "bg-slate-900"
+                : "bg-slate-900/50 shadow-glass-lg backdrop-blur-lg"
+            }`}
+            onClick={(e) => e.stopPropagation()}
           >
             <div className="grid grid-cols-2 gap-4">
               <div>

@@ -9,6 +9,7 @@ import { usePresenceManager } from "@/components/lounge/usePresenceManager";
 import { useTimerSync } from "@/components/lounge/useTimerSync";
 import { AmbientPlayer, AmbientPlayerHandle } from "@/components/AmbientPlayer";
 import { AvatarDrawer } from "@/components/AvatarDrawer";
+import { AvatarDot } from "@/components/AvatarDot";
 import { AvatarSprite } from "@/components/AvatarSprite";
 import { CornerstoneMenu } from "@/components/CornerstoneMenu";
 import AuthModal from "@/components/AuthModal";
@@ -57,6 +58,8 @@ export default function HomePage() {
     setBreakSessionMinutes,
     isAuthModalOpen,
     toggleAuthModal,
+    focusSaverEnabled,
+    setFocusSaverEnabled,
   } = useUIStore(
     useShallow((state) => ({
       avatarColor: state.avatarColor,
@@ -69,6 +72,8 @@ export default function HomePage() {
       setBreakSessionMinutes: state.setBreakSessionMinutes,
       isAuthModalOpen: state.isAuthModalOpen,
       toggleAuthModal: state.toggleAuthModal,
+      focusSaverEnabled: state.focusSaverEnabled,
+      setFocusSaverEnabled: state.setFocusSaverEnabled,
     }))
   );
 
@@ -81,6 +86,7 @@ export default function HomePage() {
     showWelcome,
     isStatusShared,
     status,
+    lowPower: focusSaverEnabled,
     containerRef,
     targetPositionRef,
     onToast: handleToast,
@@ -104,6 +110,7 @@ export default function HomePage() {
     showWelcome,
     focusDurationMs,
     breakDurationMs,
+    lowPower: focusSaverEnabled,
   });
 
   const ensureAmbientPlayback = useCallback(() => {
@@ -136,7 +143,8 @@ export default function HomePage() {
 
     const reducedMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
     const updateReducedMotion = () => {
-      body.dataset.motion = reducedMotionQuery.matches ? "reduced" : "full";
+      body.dataset.motion =
+        focusSaverEnabled || reducedMotionQuery.matches ? "reduced" : "full";
     };
     updateReducedMotion();
     reducedMotionQuery.addEventListener("change", updateReducedMotion);
@@ -152,7 +160,7 @@ export default function HomePage() {
       reducedMotionQuery.removeEventListener("change", updateReducedMotion);
       contrastQuery.removeEventListener("change", updateContrast);
     };
-  }, []);
+  }, [focusSaverEnabled]);
 
   useEffect(() => {
     if (!identity) return;
@@ -257,17 +265,31 @@ export default function HomePage() {
     }
   }, [connectionStatus]);
 
+  // Focus saver uses solid color for minimal GPU usage
+  const sceneBackground = focusSaverEnabled
+    ? "none"
+    : "url('/lofi.gif')";
+
   return (
-    <main className="relative min-h-screen overflow-hidden bg-twilight text-slate-100">
-      <div className="fixed left-4 top-4 z-30 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-parchment shadow-glass-sm backdrop-blur">
+    <main className={`relative min-h-screen overflow-hidden text-slate-100 ${focusSaverEnabled ? "bg-slate-900" : "bg-twilight"}`}>
+      <div className={`fixed left-4 top-4 z-30 rounded-full border border-white/10 px-3 py-1 text-xs text-parchment ${
+        focusSaverEnabled ? "bg-slate-800" : "bg-white/5 shadow-glass-sm backdrop-blur"
+      }`}>
         Presence: {connectionLabel}
+        {focusSaverEnabled && (
+          <span className="ml-2 rounded-full border border-white/15 bg-white/10 px-2 py-0.5 text-[0.6rem] uppercase tracking-[0.2em] text-slate-200/80">
+            Focus Saver
+          </span>
+        )}
       </div>
       <div
         ref={containerRef}
-        className={`relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-cover bg-center transition duration-500 ${
-          showWelcome || isAuthModalOpen ? "pointer-events-none scale-[0.98] blur-[1.5px]" : ""
+        className={`relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-cover bg-center ${
+          focusSaverEnabled
+            ? (showWelcome || isAuthModalOpen ? "pointer-events-none opacity-50" : "")
+            : `transition duration-500 ${showWelcome || isAuthModalOpen ? "pointer-events-none scale-[0.98] blur-[1.5px]" : ""}`
         }`}
-        style={{ backgroundImage: "url('/lofi.gif')" }}
+        style={{ backgroundImage: sceneBackground }}
         onPointerDown={handleScenePointerDown}
         onPointerMove={handleScenePointerMove}
         onPointerUp={handleScenePointerDown}
@@ -275,19 +297,25 @@ export default function HomePage() {
         aria-label="StudyHarbor shared space. Click to move your avatar."
         aria-hidden={showWelcome || isAuthModalOpen}
 >
-        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(15,23,42,0.85)_0%,rgba(15,23,42,0.55)_35%,rgba(15,23,42,0.85)_100%)] mix-blend-multiply" />
-        <div className="pointer-events-none absolute inset-0 -m-[30%] animate-aurora-drift bg-[radial-gradient(circle_at_22%_25%,rgba(251,191,36,0.14),transparent_45%),radial-gradient(circle_at_80%_30%,rgba(96,165,250,0.2),transparent_55%),radial-gradient(circle_at_50%_75%,rgba(248,113,113,0.18),transparent_50%)] blur-[40px] opacity-85" />
-
-        <div className="pointer-events-none absolute left-[18%] top-[12%] h-64 w-64 rounded-full bg-[#fcd34d1a] blur-3xl" />
-        <div className="pointer-events-none absolute right-[12%] top-[28%] h-72 w-72 rounded-full bg-[#38bdf81a] blur-3xl" />
-        <div className="pointer-events-none absolute bottom-[18%] left-[30%] h-80 w-80 rounded-full bg-[#f973af1a] blur-3xl" />
+        {!focusSaverEnabled && (
+          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(15,23,42,0.85)_0%,rgba(15,23,42,0.55)_35%,rgba(15,23,42,0.85)_100%)] mix-blend-multiply" />
+        )}
+        {!focusSaverEnabled && (
+          <>
+            <div className="pointer-events-none absolute inset-0 -m-[30%] animate-aurora-drift bg-[radial-gradient(circle_at_22%_25%,rgba(251,191,36,0.14),transparent_45%),radial-gradient(circle_at_80%_30%,rgba(96,165,250,0.2),transparent_55%),radial-gradient(circle_at_50%_75%,rgba(248,113,113,0.18),transparent_50%)] blur-[40px] opacity-85" />
+            <div className="pointer-events-none absolute left-[18%] top-[12%] h-64 w-64 rounded-full bg-[#fcd34d1a] blur-3xl" />
+            <div className="pointer-events-none absolute right-[12%] top-[28%] h-72 w-72 rounded-full bg-[#38bdf81a] blur-3xl" />
+            <div className="pointer-events-none absolute bottom-[18%] left-[30%] h-80 w-80 rounded-full bg-[#f973af1a] blur-3xl" />
+          </>
+        )}
 
         <div className={`absolute inset-0 transition-opacity duration-500 opacity-100`}>
 
-        <motion.div 
-          whileHover={{ scale: 1.1 }}
+        <motion.div
+          whileHover={focusSaverEnabled ? undefined : { scale: 1.1 }}
           className="absolute bottom-8 right-8 flex items-center gap-2"
           onPointerDown={(e) => e.stopPropagation()}
+          onPointerUp={(e) => e.stopPropagation()}
         >
           <button
             type="button"
@@ -299,7 +327,7 @@ export default function HomePage() {
           </button>
         </motion.div>
 
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2" onPointerDown={(e) => e.stopPropagation()}>
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2" onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => e.stopPropagation()}>
           <AmbientPlayer
             ref={ambientPlayerRef}
             src="/lofi.mp3"
@@ -307,31 +335,50 @@ export default function HomePage() {
           />
         </div>
 
-        <SharedAura active={sharedActive} participants={avatars} />
+        {!focusSaverEnabled && (
+          <SharedAura active={sharedActive} participants={avatars} />
+        )}
 
         <div className="pointer-events-none absolute inset-0">
           {avatars.map((avatar) => (
-            <AvatarSprite
-              key={avatar.id}
-              x={avatar.x}
-              y={avatar.y}
-              color={avatar.color}
-              name={avatar.name}
-              isSelf={avatar.isSelf}
-              isHovered={!!avatar.isHovered}
-              status={avatar.status}
-              onHoverChange={(hovering) =>
-                handleHoverChange(avatar.id, hovering)
-              }
-            />
+            focusSaverEnabled ? (
+              <AvatarDot
+                key={avatar.id}
+                x={avatar.x}
+                y={avatar.y}
+                color={avatar.color}
+                name={avatar.name}
+                isSelf={avatar.isSelf}
+                isHovered={!!avatar.isHovered}
+                status={avatar.status}
+                onHoverChange={(hovering) =>
+                  handleHoverChange(avatar.id, hovering)
+                }
+              />
+            ) : (
+              <AvatarSprite
+                key={avatar.id}
+                x={avatar.x}
+                y={avatar.y}
+                color={avatar.color}
+                name={avatar.name}
+                isSelf={avatar.isSelf}
+                isHovered={!!avatar.isHovered}
+                status={avatar.status}
+                onHoverChange={(hovering) =>
+                  handleHoverChange(avatar.id, hovering)
+                }
+              />
+            )
           ))}
         </div>
 
         {/* Timer - top right */}
-        <motion.div 
-          whileHover={{ scale: 1.05 }}
-          className="absolute top-8 right-8 w-full max-w-xs" 
+        <motion.div
+          whileHover={focusSaverEnabled ? undefined : { scale: 1.05 }}
+          className="absolute top-8 right-8 w-full max-w-xs"
           onPointerDown={(e) => e.stopPropagation()}
+          onPointerUp={(e) => e.stopPropagation()}
         >
           <PomodoroPanel
             mode={timerState.mode}
@@ -355,6 +402,7 @@ export default function HomePage() {
             onStatusChange={setStatus}
             isStatusShared={isStatusShared}
             onIsStatusSharedChange={setIsStatusShared}
+            lowPower={focusSaverEnabled}
           />
         </motion.div>
         </div>
@@ -371,6 +419,8 @@ export default function HomePage() {
         onFocusSessionChange={setFocusSessionMinutes}
         breakSessionMinutes={breakSessionMinutes}
         onBreakSessionChange={setBreakSessionMinutes}
+        focusSaverEnabled={focusSaverEnabled}
+        onFocusSaverChange={setFocusSaverEnabled}
         participants={participants}
         onlineCount={onlineCount}
         displayName={displayName}
@@ -405,6 +455,7 @@ export default function HomePage() {
         onDismiss={() => setToast(prev => ({ ...prev, visible: false }))}
         color={toast.color}
         duration={3000}
+        lowPower={focusSaverEnabled}
       />
     </main>
   );

@@ -94,3 +94,13 @@ body[data-motion="reduced"] *::after {
     background-attachment: scroll;
   }
 }
+
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}

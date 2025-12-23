@@ -22,6 +22,7 @@ type UseTimerSyncProps = {
   showWelcome: boolean;
   focusDurationMs: number;
   breakDurationMs: number;
+  lowPower: boolean;
 };
 
 export function useTimerSync({
@@ -29,6 +30,7 @@ export function useTimerSync({
   showWelcome,
   focusDurationMs,
   breakDurationMs,
+  lowPower,
 }: UseTimerSyncProps) {
   const durationsRef = useRef<TimerDurations>({
     focusDurationMs,
@@ -48,13 +50,16 @@ export function useTimerSync({
     timerRef.current = timerState;
   }, [timerState]);
 
-  // Sync duration refs and reset if updated while idle on focus phase
+  // Sync duration refs and update remainingMs if timer is idle
   useEffect(() => {
     durationsRef.current = { focusDurationMs, breakDurationMs };
     setTimerState((prev) => {
-      if (prev.phase !== "focus" || prev.isRunning) return prev;
-      if (prev.remainingMs === focusDurationMs) return prev;
-      return { ...prev, remainingMs: focusDurationMs };
+      // Only update remaining time if timer is not running
+      if (prev.isRunning) return prev;
+
+      const targetDuration = prev.phase === "focus" ? focusDurationMs : breakDurationMs;
+      if (prev.remainingMs === targetDuration) return prev;
+      return { ...prev, remainingMs: targetDuration, lastUpdatedAt: Date.now() };
     });
   }, [focusDurationMs, breakDurationMs]);
 
@@ -109,41 +114,57 @@ export function useTimerSync({
   
   // The main timer countdown loop
   useEffect(() => {
-    const tick = () => {
+    const runTick = (now: number) => {
       const timer = timerRef.current;
-      if (timer.isRunning) {
-        const now = Date.now();
-        const elapsed = now - timer.lastUpdatedAt;
+      if (!timer.isRunning) return;
 
-        if (elapsed >= 250) { // Update state roughly 4 times a second
-          setTimerState((current) => {
-            const updated = tickTimer(current, now, durationsRef.current);
+      setTimerState((current) => {
+        const updated = tickTimer(current, now, durationsRef.current);
 
-            if (
-              updated.mode === "shared" &&
-              now - lastTimerBroadcastRef.current >= TIMER_BROADCAST_INTERVAL_MS &&
-              (updated.remainingMs !== current.remainingMs || updated.phase !== current.phase)
-            ) {
-              lastTimerBroadcastRef.current = now;
-              sharedTimerSnapshotRef.current = updated;
-              channelRef.current?.send({
-                type: "broadcast",
-                event: "timer:update",
-                payload: updated,
-              });
-            }
-            return updated;
+        if (
+          updated.mode === "shared" &&
+          now - lastTimerBroadcastRef.current >= TIMER_BROADCAST_INTERVAL_MS &&
+          (updated.remainingMs !== current.remainingMs || updated.phase !== current.phase)
+        ) {
+          lastTimerBroadcastRef.current = now;
+          sharedTimerSnapshotRef.current = updated;
+          channelRef.current?.send({
+            type: "broadcast",
+            event: "timer:update",
+            payload: updated,
           });
         }
+        return updated;
+      });
+    };
+
+    if (lowPower) {
+      const intervalId = window.setInterval(() => {
+        runTick(Date.now());
+      }, 1000);
+      return () => {
+        window.clearInterval(intervalId);
+      };
+    }
+
+    const tick = () => {
+      const now = Date.now();
+      const elapsed = now - timerRef.current.lastUpdatedAt;
+
+      if (elapsed >= 250) {
+        runTick(now);
       }
       animationFrameRef.current = requestAnimationFrame(tick);
     };
 
     animationFrameRef.current = requestAnimationFrame(tick);
     return () => {
-      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
     };
-  }, [focusDurationMs, breakDurationMs]);
+  }, [lowPower]); // Don't include durations - we read from durationsRef.current
 
   const updateTimerState = useCallback(
     (
@@ -185,7 +206,7 @@ export function useTimerSync({
       payload: { requesterId: identity.guestId },
     });
 
-  }, [identity, showWelcome, focusDurationMs, updateTimerState]);
+  }, [identity, showWelcome, updateTimerState]);
 
   const handleStartStop = useCallback(() => {
     updateTimerState((prev, now) => toggleRunning(prev, now));

@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { X, Settings, Users, Info, Clock, Coffee, Droplets, UserCircle, LayoutGrid, Palette, LogOut, Mail, DollarSign } from "lucide-react";
+import { X, Settings, Users, Info, Clock, Coffee, Droplets, UserCircle, LayoutGrid, Palette, LogOut, Mail, DollarSign, Leaf } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { COZY_AVATAR_COLORS } from "@/lib/utils";
@@ -28,6 +28,8 @@ type CornerstoneMenuProps = {
   onFocusSessionChange: (minutes: number) => void;
   breakSessionMinutes: number;
   onBreakSessionChange: (minutes: number) => void;
+  focusSaverEnabled: boolean;
+  onFocusSaverChange: (enabled: boolean) => void;
   // Players props
   participants: Participant[];
   // About props
@@ -219,10 +221,10 @@ function PlayersContent({ participants, onlineCount }: { participants: Participa
 // Settings Tab Content
 function SettingsContent(props: Omit<CornerstoneMenuProps, 'open' | 'onClose' | 'participants' | 'onlineCount' | 'displayName' | 'initialName' | 'initialColor' | 'onConfirm' | 'user' | 'toggleAuthModal'>) {
   return (
-    <div className="h-full overflow-y-auto pr-4 text-sm">
-      <section className="space-y-4">
-        <p className="text-[0.64rem] uppercase tracking-[0.24em] text-slate-300/70">Ambient Volume</p>
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+    <div className="space-y-4 text-sm">
+      <section>
+        <p className="mb-2 text-[0.64rem] uppercase tracking-[0.24em] text-slate-300/70">Ambient Volume</p>
+        <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3">
           <div className="flex items-center justify-between text-xs text-slate-300/80">
             <span className="inline-flex items-center gap-2 uppercase tracking-[0.22em]">
               <Droplets className="h-3.5 w-3.5" />
@@ -233,13 +235,13 @@ function SettingsContent(props: Omit<CornerstoneMenuProps, 'open' | 'onClose' | 
           <input
             type="range" min={0} max={1} step={0.01} value={props.ambientVolume}
             onChange={(e) => props.onAmbientVolumeChange(Number(e.target.value))}
-            className="mt-4 w-full accent-[#E8C877]"
+            className="mt-2 w-full accent-[#E8C877]"
           />
         </div>
       </section>
-      <section className="mt-8 space-y-4">
-        <p className="text-[0.64rem] uppercase tracking-[0.24em] text-slate-300/70">Focus Time</p>
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+      <section>
+        <p className="mb-2 text-[0.64rem] uppercase tracking-[0.24em] text-slate-300/70">Focus Time</p>
+        <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3">
           <div className="flex items-center justify-between text-xs text-slate-300/80">
             <span className="inline-flex items-center gap-2 uppercase tracking-[0.22em]">
               <Clock className="h-3.5 w-3.5" />
@@ -250,13 +252,13 @@ function SettingsContent(props: Omit<CornerstoneMenuProps, 'open' | 'onClose' | 
           <input
             type="range" min={5} max={90} step={5} value={props.focusSessionMinutes}
             onChange={(e) => props.onFocusSessionChange(Number(e.target.value))}
-            className="mt-4 w-full accent-[#E8C877]"
+            className="mt-2 w-full accent-[#E8C877]"
           />
         </div>
       </section>
-      <section className="mt-6 space-y-4">
-        <p className="text-[0.64rem] uppercase tracking-[0.24em] text-slate-300/70">Break Time</p>
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+      <section>
+        <p className="mb-2 text-[0.64rem] uppercase tracking-[0.24em] text-slate-300/70">Break Time</p>
+        <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3">
           <div className="flex items-center justify-between text-xs text-slate-300/80">
             <span className="inline-flex items-center gap-2 uppercase tracking-[0.22em]">
               <Coffee className="h-3.5 w-3.5" />
@@ -267,8 +269,38 @@ function SettingsContent(props: Omit<CornerstoneMenuProps, 'open' | 'onClose' | 
           <input
             type="range" min={1} max={30} step={1} value={props.breakSessionMinutes}
             onChange={(e) => props.onBreakSessionChange(Number(e.target.value))}
-            className="mt-4 w-full accent-[#E8C877]"
+            className="mt-2 w-full accent-[#E8C877]"
           />
+        </div>
+      </section>
+      <section>
+        <p className="mb-2 text-[0.64rem] uppercase tracking-[0.24em] text-slate-300/70">Focus Saver</p>
+        <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2 text-xs uppercase tracking-[0.22em] text-slate-300/80">
+              <Leaf className="h-3.5 w-3.5" />
+              <span>Lighter visuals & lower power</span>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-label="Toggle focus saver mode"
+              aria-checked={props.focusSaverEnabled}
+              onClick={() => props.onFocusSaverChange(!props.focusSaverEnabled)}
+              className={`relative h-6 w-11 shrink-0 rounded-full border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 ${
+                props.focusSaverEnabled
+                  ? "border-twilight-ember/60 bg-twilight-ember/50"
+                  : "border-white/15 bg-white/10"
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 h-5 w-5 rounded-full bg-white/90 transition ${
+                  props.focusSaverEnabled ? "left-5" : "left-0.5"
+                }`}
+                aria-hidden="true"
+              />
+            </button>
+          </div>
         </div>
       </section>
     </div>
@@ -277,7 +309,8 @@ function SettingsContent(props: Omit<CornerstoneMenuProps, 'open' | 'onClose' | 
 
 // Account Tab Content
 function AccountContent({ user, toggleAuthModal, onClose, displayName, subscriptionStatus }: { user: User | null, toggleAuthModal: (isOpen: boolean) => void, onClose: () => void, displayName: string, subscriptionStatus: string }) {
-  
+  const router = useRouter();
+
   const handleSignOut = async () => {
     await authService.signOut();
     onClose();
@@ -285,6 +318,11 @@ function AccountContent({ user, toggleAuthModal, onClose, displayName, subscript
 
   const handleSignIn = () => {
     toggleAuthModal(true);
+    onClose();
+  };
+
+  const handleViewPricing = () => {
+    router.push('/pricing');
     onClose();
   };
 
@@ -304,7 +342,7 @@ function AccountContent({ user, toggleAuthModal, onClose, displayName, subscript
         </div>
 
         <div className="p-4 rounded-lg bg-twilight-overlay border border-white/10">
-          <h4 className="text-sm font-medium text-parchment mb-2">✨ Benefits of signing in:</h4>
+          <h4 className="text-sm font-medium text-parchment mb-2">Benefits of signing in:</h4>
           <ul className="space-y-2 text-sm text-slate-300/80">
             <li className="flex items-start gap-2">
               <span className="text-twilight-ember mt-0.5">•</span>
@@ -318,19 +356,24 @@ function AccountContent({ user, toggleAuthModal, onClose, displayName, subscript
               <span className="text-twilight-ember mt-0.5">•</span>
               <span>Access from any device</span>
             </li>
-            <li className="flex items-start gap-2">
-              <span className="text-twilight-ember mt-0.5">•</span>
-              <span>Unlock pro features (coming soon)</span>
-            </li>
           </ul>
         </div>
 
-        <button
-          onClick={handleSignIn}
-          className="w-full rounded-full bg-twilight-ember/90 px-6 py-3 text-sm font-semibold text-twilight shadow-[0_18px_36px_rgba(252,211,77,0.45)] transition hover:scale-[1.02] active:scale-[0.98]"
-        >
-          Sign In / Sign Up
-        </button>
+        <div className="space-y-2">
+          <button
+            onClick={handleSignIn}
+            className="w-full rounded-full bg-twilight-ember/90 px-6 py-3 text-sm font-semibold text-twilight shadow-[0_18px_36px_rgba(252,211,77,0.45)] transition hover:scale-[1.02] active:scale-[0.98]"
+          >
+            Sign In / Sign Up
+          </button>
+          <button
+            onClick={handleViewPricing}
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-full bg-white/5 text-slate-300 hover:bg-white/10 transition-colors"
+          >
+            <DollarSign className="w-4 h-4" />
+            <span className="text-sm font-medium">View Pricing</span>
+          </button>
+        </div>
       </div>
     );
   }
@@ -410,25 +453,20 @@ function AccountContent({ user, toggleAuthModal, onClose, displayName, subscript
       {/* Actions */}
       <div className="space-y-2 pt-4 border-t border-white/10">
         <button
-          onClick={handleManageBilling}
-          className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-full bg-twilight-ember/20 text-twilight-ember hover:bg-twilight-ember/30 transition-colors disabled:opacity-60"
-          disabled={billingLoading}
+          onClick={handleViewPricing}
+          className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-full bg-twilight-ember/20 text-twilight-ember hover:bg-twilight-ember/30 transition-colors"
         >
           <DollarSign className="w-4 h-4" />
-          <span className="text-sm font-medium">{billingLoading ? "Opening billing..." : "Manage Billing"}</span>
+          <span className="text-sm font-medium">View Pricing</span>
         </button>
 
         <button
           onClick={handleSignOut}
-          className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-full bg-twilight-blush/20 text-twilight-blush hover:bg-twilight-blush/30 transition-colors"
+          className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-full bg-white/5 text-slate-300 hover:bg-white/10 transition-colors"
         >
           <LogOut className="w-4 h-4" />
           <span className="text-sm font-medium">Sign Out</span>
         </button>
-
-        <p className="text-center text-xs text-slate-300/50">
-          Signing out will return you to a guest session.
-        </p>
       </div>
     </div>
   );
@@ -436,15 +474,9 @@ function AccountContent({ user, toggleAuthModal, onClose, displayName, subscript
 
 export function CornerstoneMenu(props: CornerstoneMenuProps) {
   const [activeTab, setActiveTab] = useState("players");
-  const router = useRouter(); // Initialize useRouter
 
   const handleTabClick = (tabName: string) => {
-    if (tabName === "pricing") {
-      router.push('/pricing');
-      props.onClose(); // Close menu when navigating
-    } else {
-      setActiveTab(tabName);
-    }
+    setActiveTab(tabName);
   };
 
   return (
@@ -452,78 +484,81 @@ export function CornerstoneMenu(props: CornerstoneMenuProps) {
       {props.open && (
         <motion.div
           key="cornerstone-menu"
-          className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-900/50 backdrop-blur-lg"
-          initial={{ opacity: 0 }}
+          className={`fixed inset-0 z-[90] flex items-center justify-center ${
+            props.focusSaverEnabled
+              ? "bg-slate-900/95"
+              : "bg-slate-900/50 backdrop-blur-lg"
+          }`}
+          initial={props.focusSaverEnabled ? false : { opacity: 0 }}
           animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.3, ease: "easeInOut" }}
+          exit={props.focusSaverEnabled ? undefined : { opacity: 0 }}
+          transition={props.focusSaverEnabled ? { duration: 0 } : { duration: 0.3, ease: "easeInOut" }}
           onClick={props.onClose}
         >
           <motion.div
-            className="relative flex h-[min(600px,90vh)] w-[min(800px,94vw)] flex-col rounded-glass border border-white/10 bg-slate-900/60 shadow-glass-lg"
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.95, opacity: 0 }}
-            transition={{ duration: 0.3, ease: "easeInOut" }}
+            className={`relative flex h-[min(600px,90vh)] w-[min(800px,94vw)] flex-col overflow-hidden rounded-glass border border-white/10 ${
+              props.focusSaverEnabled
+                ? "bg-slate-900"
+                : "bg-slate-900/60 shadow-glass-lg"
+            }`}
+            initial={props.focusSaverEnabled ? false : { scale: 0.95, opacity: 0 }}
+            animate={props.focusSaverEnabled ? { opacity: 1 } : { scale: 1, opacity: 1 }}
+            exit={props.focusSaverEnabled ? undefined : { scale: 0.95, opacity: 0 }}
+            transition={props.focusSaverEnabled ? { duration: 0 } : { duration: 0.3, ease: "easeInOut" }}
             onClick={(e) => e.stopPropagation()}
           >
-            <header className="flex items-center justify-between border-b border-white/10 p-4">
-              <div className="flex items-center gap-4">
-                <button
-                  onClick={() => handleTabClick("players")}
-                  className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm transition ${activeTab === "players" ? "bg-white/10 text-white" : "text-slate-300/70 hover:bg-white/5"}`}>
-                  <Users className="h-4 w-4" />
-                  <span>Players</span>
-                </button>
-                <button
-                  onClick={() => handleTabClick("avatar")}
-                  className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm transition ${activeTab === "avatar" ? "bg-white/10 text-white" : "text-slate-300/70 hover:bg-white/5"}`}>
-                  <Palette className="h-4 w-4" />
-                  <span>Avatar</span>
-                </button>
-                <button
-                  onClick={() => handleTabClick("account")}
-                  className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm transition ${activeTab === "account" ? "bg-white/10 text-white" : "text-slate-300/70 hover:bg-white/5"}`}>
-                  <UserCircle className="h-4 w-4" />
-                  <span>Account</span>
-                </button>
-                <button
-                  onClick={() => handleTabClick("pricing")} // New Pricing Button
-                  className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm transition ${activeTab === "pricing" ? "bg-white/10 text-white" : "text-slate-300/70 hover:bg-white/5"}`}>
-                  <DollarSign className="h-4 w-4" />
-                  <span>Pricing</span>
-                </button>
-                <button
-                  onClick={() => handleTabClick("lobbies")}
-                  className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm transition ${activeTab === "lobbies" ? "bg-white/10 text-white" : "text-slate-300/70 hover:bg-white/5"}`}>
-                  <LayoutGrid className="h-4 w-4" />
-                  <span>Lobbies</span>
-                </button>
-                <button
-                  onClick={() => setActiveTab("settings")}
-                  className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm transition ${activeTab === "settings" ? "bg-white/10 text-white" : "text-slate-300/70 hover:bg-white/5"}`}>
-                  <Settings className="h-4 w-4" />
-                  <span>Settings</span>
-                </button>
-                <button
-                  onClick={() => setActiveTab("about")}
-                  className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm transition ${activeTab === "about" ? "bg-white/10 text-white" : "text-slate-300/70 hover:bg-white/5"}`}>
-                  <Info className="h-4 w-4" />
-                  <span>About</span>
-                </button>
+            <header className="flex items-center gap-2 border-b border-white/10 py-4 pr-4">
+              <div className="flex-1 overflow-x-auto scrollbar-hide">
+                <div className="flex items-center gap-2 pl-4">
+                  <button
+                    onClick={() => handleTabClick("players")}
+                    className={`flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-sm transition ${activeTab === "players" ? "bg-white/10 text-white" : "text-slate-300/70 hover:bg-white/5"}`}>
+                    <Users className="h-4 w-4" />
+                    <span>Players</span>
+                  </button>
+                  <button
+                    onClick={() => handleTabClick("avatar")}
+                    className={`flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-sm transition ${activeTab === "avatar" ? "bg-white/10 text-white" : "text-slate-300/70 hover:bg-white/5"}`}>
+                    <Palette className="h-4 w-4" />
+                    <span>Avatar</span>
+                  </button>
+                  <button
+                    onClick={() => handleTabClick("account")}
+                    className={`flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-sm transition ${activeTab === "account" ? "bg-white/10 text-white" : "text-slate-300/70 hover:bg-white/5"}`}>
+                    <UserCircle className="h-4 w-4" />
+                    <span>Account</span>
+                  </button>
+                  <button
+                    onClick={() => handleTabClick("lobbies")}
+                    className={`flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-sm transition ${activeTab === "lobbies" ? "bg-white/10 text-white" : "text-slate-300/70 hover:bg-white/5"}`}>
+                    <LayoutGrid className="h-4 w-4" />
+                    <span>Lobbies</span>
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("settings")}
+                    className={`flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-sm transition ${activeTab === "settings" ? "bg-white/10 text-white" : "text-slate-300/70 hover:bg-white/5"}`}>
+                    <Settings className="h-4 w-4" />
+                    <span>Settings</span>
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("about")}
+                    className={`flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-sm transition ${activeTab === "about" ? "bg-white/10 text-white" : "text-slate-300/70 hover:bg-white/5"}`}>
+                    <Info className="h-4 w-4" />
+                    <span>About</span>
+                  </button>
+                </div>
               </div>
               <button
                 onClick={props.onClose}
-                className="rounded-full p-2 text-slate-300/70 transition hover:bg-white/10 hover:text-white">
+                className="shrink-0 rounded-full p-2 text-slate-300/70 transition hover:bg-white/10 hover:text-white">
                 <X className="h-5 w-5" />
               </button>
             </header>
 
-            <main className="flex-1 overflow-hidden p-6">
+            <main className="flex-1 overflow-y-auto p-6">
               {activeTab === "players" && <PlayersContent participants={props.participants} onlineCount={props.onlineCount} />}
               {activeTab === "avatar" && <AvatarContent {...props} />}
               {activeTab === "account" && <AccountContent user={props.user} toggleAuthModal={props.toggleAuthModal} onClose={props.onClose} displayName={props.displayName} subscriptionStatus={props.subscriptionStatus} />}
-              {activeTab === "pricing" && <PricingContent onClose={props.onClose} />}
               {activeTab === "lobbies" && <div className="text-slate-400">Lobby switching coming soon.</div>}
               {activeTab === "about" && <AboutContent onlineCount={props.onlineCount} displayName={props.displayName} />}
               {activeTab === "settings" && <SettingsContent {...props} />}
@@ -532,27 +567,5 @@ export function CornerstoneMenu(props: CornerstoneMenuProps) {
         </motion.div>
       )}
     </AnimatePresence>
-  );
-}
-
-function PricingContent({ onClose }: { onClose: () => void }) {
-  const router = useRouter();
-
-  const handleGoToPricing = () => {
-    router.push('/pricing');
-    onClose();
-  };
-
-  return (
-    <div className="flex flex-col items-center justify-center h-full space-y-4 text-parchment">
-      <h3 className="text-xl font-bold">Manage Your Plan</h3>
-      <p className="text-text-muted">View pricing options and upgrade.</p>
-      <button
-        onClick={handleGoToPricing}
-        className="rounded-full bg-twilight-ember/90 px-6 py-3 text-sm font-semibold text-twilight shadow-[0_18px_36px_rgba(252,211,77,0.45)] transition hover:scale-[1.02] active:scale-[0.98]"
-      >
-        Go to Pricing Page
-      </button>
-    </div>
   );
 }

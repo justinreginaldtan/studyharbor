@@ -12,12 +12,14 @@ type UIState = {
   avatarColor: string;
   ambientPlaying: boolean;
   isAuthModalOpen: boolean;
+  focusSaverEnabled: boolean;
   setAmbientVolume: (volume: number) => void;
   setFocusSessionMinutes: (minutes: number) => void;
   setBreakSessionMinutes: (minutes: number) => void;
   setAvatarColor: (hex: string) => void;
   setAmbientPlaying: (playing: boolean) => void;
   toggleAuthModal: (isOpen: boolean) => void;
+  setFocusSaverEnabled: (enabled: boolean) => void;
 };
 
 const DEFAULTS: Pick<
@@ -26,11 +28,13 @@ const DEFAULTS: Pick<
   | "focusSessionMinutes"
   | "breakSessionMinutes"
   | "avatarColor"
+  | "focusSaverEnabled"
 > = {
   ambientVolume: 0.65,
   focusSessionMinutes: 25,
   breakSessionMinutes: 5,
   avatarColor: "#F8DCA4",
+  focusSaverEnabled: false,
 };
 
 // Cached server snapshot to avoid infinite loops
@@ -44,6 +48,7 @@ const serverSnapshot: UIState = {
   setAvatarColor: () => {},
   setAmbientPlaying: () => {},
   toggleAuthModal: () => {},
+  setFocusSaverEnabled: () => {},
 };
 
 export const useUIStore = create<UIState>()(
@@ -63,6 +68,7 @@ export const useUIStore = create<UIState>()(
       setAvatarColor: (avatarColor) => set({ avatarColor }),
       setAmbientPlaying: (ambientPlaying) => set({ ambientPlaying }),
       toggleAuthModal: (isAuthModalOpen) => set({ isAuthModalOpen }),
+      setFocusSaverEnabled: (focusSaverEnabled) => set({ focusSaverEnabled }),
     }),
     {
       name: "studyharbor.ui",

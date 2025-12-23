@@ -8,7 +8,9 @@
       "Bash(lsof:*)",
       "Bash(kill:*)",
       "Bash(tree:*)",
-      "Bash(npm run dev:*)"
+      "Bash(npm run dev:*)",
+      "Bash(find:*)",
+      "Bash(npx playwright --version)"
     ],
     "deny": [],
     "ask": []

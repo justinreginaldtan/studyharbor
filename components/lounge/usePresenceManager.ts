@@ -9,6 +9,8 @@ import { approach, lerp, clampNormalized } from "@/lib/utils";
 const MOVE_SPEED = 0.13;
 const REMOTE_SMOOTHING = 0.18;
 const PRESENCE_BROADCAST_INTERVAL_MS = 120;
+const LOW_POWER_BROADCAST_INTERVAL_MS = 1000;
+const LOW_POWER_TICK_INTERVAL_MS = 1000;
 const MAX_STATUS_LENGTH = 120;
 
 const sanitizeStatus = (value: string | undefined) => {
@@ -33,6 +35,7 @@ type UsePresenceManagerProps = {
   showWelcome: boolean;
   isStatusShared: boolean;
   status: string;
+  lowPower: boolean;
   containerRef: React.RefObject<HTMLDivElement | null>;
   targetPositionRef: React.RefObject<{ x: number; y: number }>;
   onToast: (message: string, color?: string) => void;
@@ -43,6 +46,7 @@ export function usePresenceManager({
   showWelcome,
   isStatusShared,
   status,
+  lowPower,
   containerRef,
   targetPositionRef,
   onToast,
@@ -173,12 +177,14 @@ export function usePresenceManager({
     }
     
     const { guestId, displayName, color } = identity;
+    lastFrameRef.current = null;
 
     const tick = (frameTime: number) => {
-      animationRef.current = requestAnimationFrame(tick);
-      
       const previous = lastFrameRef.current ?? frameTime;
-      const deltaSeconds = Math.min(0.12, (frameTime - previous) / 1000);
+      const deltaSeconds = Math.min(
+        lowPower ? 1 : 0.12,
+        (frameTime - previous) / 1000
+      );
       lastFrameRef.current = frameTime;
 
       const container = containerRef.current;
@@ -191,7 +197,14 @@ export function usePresenceManager({
       }
 
       const nowMs = Date.now();
-      if (presenceReadyRef.current && channelRef.current && nowMs - lastPresenceBroadcastRef.current > PRESENCE_BROADCAST_INTERVAL_MS) {
+      const broadcastIntervalMs = lowPower
+        ? LOW_POWER_BROADCAST_INTERVAL_MS
+        : PRESENCE_BROADCAST_INTERVAL_MS;
+      if (
+        presenceReadyRef.current &&
+        channelRef.current &&
+        nowMs - lastPresenceBroadcastRef.current > broadcastIntervalMs
+      ) {
         channelRef.current.track({
           id: guestId,
           name: displayName,
@@ -217,8 +230,13 @@ export function usePresenceManager({
       }];
 
       remoteAvatarsRef.current.forEach((avatar, id) => {
-        avatar.x = lerp(avatar.x, avatar.targetX, REMOTE_SMOOTHING);
-        avatar.y = lerp(avatar.y, avatar.targetY, REMOTE_SMOOTHING);
+        if (lowPower) {
+          avatar.x = avatar.targetX;
+          avatar.y = avatar.targetY;
+        } else {
+          avatar.x = lerp(avatar.x, avatar.targetX, REMOTE_SMOOTHING);
+          avatar.y = lerp(avatar.y, avatar.targetY, REMOTE_SMOOTHING);
+        }
         renderList.push({
           id,
           color: avatar.color,
@@ -234,11 +252,41 @@ export function usePresenceManager({
       setAvatars(renderList);
     };
 
-    animationRef.current = requestAnimationFrame(tick);
+    if (lowPower) {
+      const intervalId = window.setInterval(() => {
+        const now =
+          typeof performance !== "undefined" ? performance.now() : Date.now();
+        tick(now);
+      }, LOW_POWER_TICK_INTERVAL_MS);
+      const now =
+        typeof performance !== "undefined" ? performance.now() : Date.now();
+      tick(now);
+      return () => {
+        window.clearInterval(intervalId);
+        lastFrameRef.current = null;
+      };
+    }
+
+    animationRef.current = requestAnimationFrame(function frame(time) {
+      tick(time);
+      animationRef.current = requestAnimationFrame(frame);
+    });
     return () => {
-      if (animationRef.current) cancelAnimationFrame(animationRef.current);
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+        animationRef.current = null;
+      }
+      lastFrameRef.current = null;
     };
-  }, [identity, showWelcome, status, isStatusShared, containerRef, targetPositionRef]);
+  }, [
+    identity,
+    showWelcome,
+    status,
+    isStatusShared,
+    containerRef,
+    targetPositionRef,
+    lowPower,
+  ]);
 
   return { avatars, onlineCount, handleHoverChange, connectionStatus };
 }
